@@ -1,4 +1,4 @@
-.PHONY: proto docker-up docker-down tidy install-proto-tools
+.PHONY: proto docker-up docker-down tidy install-proto-tools migrate-up migrate-down migrate-create
 
 # Install protoc tools
 install-proto-tools:
@@ -44,3 +44,21 @@ run-user:
 
 run-token:
 	go run ./services/token-service
+
+# Database URL
+DB_URL ?= postgres://authservice:authservice@localhost:5432/authservice?sslmode=disable
+
+# Database migrations
+migrate-up:
+	migrate -path migrations -database "$(DB_URL)" up
+
+migrate-down:
+	migrate -path migrations -database "$(DB_URL)" down 1
+
+migrate-create:
+	@read -p "Migration name: " name; \
+	migrate create -ext sql -dir migrations -seq $$name
+
+install-migrate:
+	go install -tags 'postgres' github.com/golang-migrate/migrate/v4/cmd/migrate@latest
+
