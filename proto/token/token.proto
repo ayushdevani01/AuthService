@@ -1,0 +1,80 @@
+syntax = "proto3";
+
+package token;
+
+option go_package = "github.com/ayushdevani/authservice/proto/token";
+
+// TOKEN SERVICE
+// Handles JWT signing, refresh, revocation, and public keys
+
+service TokenService {
+
+  // Generate access + refresh token pair
+  rpc GenerateTokenPair(GenerateTokenPairRequest)
+      returns (GenerateTokenPairResponse);
+
+  // Refresh tokens using refresh token
+  rpc RefreshTokens(RefreshTokensRequest) returns (RefreshTokensResponse);
+
+  // Revoke a token
+  rpc RevokeToken(RevokeTokenRequest) returns (RevokeTokenResponse);
+
+  // Get public keys for JWT verification (used by SDKs)
+  rpc GetPublicKeys(GetPublicKeysRequest) returns (GetPublicKeysResponse);
+}
+
+// Generate Token Pair
+message GenerateTokenPairRequest {
+  string app_id = 1;
+  string user_id = 2;
+  string email = 3;
+  string provider = 4;
+  bool email_verified = 5;
+  string session_id = 6;
+  int64 access_token_ttl = 7;
+  int64 refresh_token_ttl = 8;
+}
+
+message GenerateTokenPairResponse {
+  string access_token = 1;
+  string refresh_token = 2;
+  int64 access_token_expires_at = 3;
+  int64 refresh_token_expires_at = 4;
+}
+
+// Refresh Tokens
+message RefreshTokensRequest {
+  string refresh_token = 1;
+  string app_id = 2;
+  bool rotate_refresh_token = 3;
+}
+
+message RefreshTokensResponse {
+  bool success = 1;
+  string access_token = 2;
+  optional string refresh_token = 3;
+  int64 access_token_expires_at = 4;
+  optional int64 refresh_token_expires_at = 5;
+  string error_code = 6;
+  string error_message = 7;
+}
+
+// Revoke Token
+message RevokeTokenRequest {
+  string token = 1;
+  string token_type = 2; // "access" or "refresh"
+  string app_id = 3;
+}
+
+message RevokeTokenResponse { bool success = 1; }
+
+// Public Keys for SDK verification
+message PublicKey {
+  string kid = 1; // Key ID
+  string public_key = 2;
+  bool is_active = 3;
+}
+
+message GetPublicKeysRequest { string app_id = 1; }
+
+message GetPublicKeysResponse { repeated PublicKey keys = 1; }

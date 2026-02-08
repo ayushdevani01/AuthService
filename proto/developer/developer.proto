@@ -1,0 +1,264 @@
+syntax = "proto3";
+
+package developer;
+
+option go_package = "github.com/ayushdevani/authservice/proto/developer";
+
+import "google/protobuf/timestamp.proto";
+
+// DEVELOPER SERVICE
+// Handles developer authentication, app management, and OAuth provider setup
+
+service DeveloperService {
+
+  // Developer Authentication
+  rpc Register(RegisterRequest) returns (RegisterResponse);
+  rpc Login(LoginRequest) returns (LoginResponse);
+  rpc Logout(LogoutRequest) returns (LogoutResponse);
+  rpc GetProfile(GetProfileRequest) returns (GetProfileResponse);
+  rpc UpdateProfile(UpdateProfileRequest) returns (UpdateProfileResponse);
+
+  // App Management
+  rpc CreateApp(CreateAppRequest) returns (CreateAppResponse);
+  rpc GetApp(GetAppRequest) returns (GetAppResponse);
+  rpc ListApps(ListAppsRequest) returns (ListAppsResponse);
+  rpc UpdateApp(UpdateAppRequest) returns (UpdateAppResponse);
+  rpc DeleteApp(DeleteAppRequest) returns (DeleteAppResponse);
+
+  // Key Management
+  rpc RotateApiKey(RotateApiKeyRequest) returns (RotateApiKeyResponse);
+  rpc RotateSigningKeys(RotateSigningKeysRequest)
+      returns (RotateSigningKeysResponse);
+  rpc ListSigningKeys(ListSigningKeysRequest) returns (ListSigningKeysResponse);
+  rpc GetActiveSigningKey(GetActiveSigningKeyRequest)
+      returns (GetActiveSigningKeyResponse);
+
+  // OAuth Provider Configuration
+  rpc AddOAuthProvider(AddOAuthProviderRequest)
+      returns (AddOAuthProviderResponse);
+  rpc GetOAuthProvider(GetOAuthProviderRequest)
+      returns (GetOAuthProviderResponse);
+  rpc ListOAuthProviders(ListOAuthProvidersRequest)
+      returns (ListOAuthProvidersResponse);
+  rpc UpdateOAuthProvider(UpdateOAuthProviderRequest)
+      returns (UpdateOAuthProviderResponse);
+  rpc DeleteOAuthProvider(DeleteOAuthProviderRequest)
+      returns (DeleteOAuthProviderResponse);
+}
+
+// Developer entity
+message Developer {
+  string id = 1;
+  string email = 2;
+  string name = 3;
+  google.protobuf.Timestamp created_at = 4;
+  google.protobuf.Timestamp updated_at = 5;
+}
+
+// Developer Authentication
+message RegisterRequest {
+  string email = 1;
+  string password = 2;
+  string name = 3;
+}
+
+message RegisterResponse {
+  Developer developer = 1;
+  string access_token = 2;
+  string refresh_token = 3;
+}
+
+message LoginRequest {
+  string email = 1;
+  string password = 2;
+}
+
+message LoginResponse {
+  Developer developer = 1;
+  string access_token = 2;
+  string refresh_token = 3;
+}
+
+message LogoutRequest {
+  string developer_id = 1;
+  string refresh_token = 2;
+}
+
+message LogoutResponse { bool success = 1; }
+
+message GetProfileRequest { string developer_id = 1; }
+
+message GetProfileResponse {
+  Developer developer = 1;
+  bool found = 2;
+}
+
+message UpdateProfileRequest {
+  string developer_id = 1;
+  optional string name = 2;
+  optional string password = 3;
+}
+
+message UpdateProfileResponse { Developer developer = 1; }
+
+// App entity
+message App {
+  string id = 1;
+  string developer_id = 2;
+  string name = 3;
+  string app_id = 4;
+  string logo_url = 5;
+  repeated string redirect_urls = 6;
+  google.protobuf.Timestamp created_at = 7;
+  google.protobuf.Timestamp updated_at = 8;
+}
+
+// App Management
+message CreateAppRequest {
+  string developer_id = 1;
+  string name = 2;
+  string logo_url = 3;
+  repeated string redirect_urls = 4;
+}
+
+message CreateAppResponse {
+  App app = 1;
+  string api_key = 2;
+  SigningKey signing_key = 3;
+}
+
+message GetAppRequest { string app_id = 1; }
+
+message GetAppResponse {
+  App app = 1;
+  bool found = 2;
+}
+
+message ListAppsRequest { string developer_id = 1; }
+
+message ListAppsResponse { repeated App apps = 1; }
+
+message UpdateAppRequest {
+  string id = 1;
+  string developer_id = 2;
+  optional string name = 3;
+  optional string logo_url = 4;
+  repeated string redirect_urls = 5;
+}
+
+message UpdateAppResponse { App app = 1; }
+
+message DeleteAppRequest {
+  string id = 1;
+  string developer_id = 2;
+}
+
+message DeleteAppResponse { bool success = 1; }
+
+// Signing Key entity
+message SigningKey {
+  string id = 1;
+  string app_id = 2;
+  string kid = 3; // "key-2026-02-08"
+  string public_key = 4;
+  bool is_active = 5;
+  google.protobuf.Timestamp created_at = 6;
+  google.protobuf.Timestamp expires_at = 7;
+  google.protobuf.Timestamp rotated_at = 8;
+}
+
+// Key Management
+message RotateApiKeyRequest {
+  string app_id = 1;
+  string developer_id = 2;
+}
+
+message RotateApiKeyResponse { string new_api_key = 1; }
+
+message RotateSigningKeysRequest {
+  string app_id = 1;
+  string developer_id = 2;
+  int32 grace_period_hours = 3; // Default: 24
+}
+
+message RotateSigningKeysResponse {
+  SigningKey new_key = 1;
+  SigningKey old_key = 2;
+}
+
+message ListSigningKeysRequest {
+  string app_id = 1;
+  string developer_id = 2;
+  bool include_expired = 3;
+}
+
+message ListSigningKeysResponse { repeated SigningKey keys = 1; }
+
+message GetActiveSigningKeyRequest { string app_id = 1; }
+
+message GetActiveSigningKeyResponse {
+  SigningKey key = 1;
+  string private_key = 2; // used by token service
+  bool found = 3;
+}
+
+// OAuth Provider
+message OAuthProvider {
+  string id = 1;
+  string app_id = 2;
+  string provider = 3; // "google", "github" etc
+  string client_id = 4;
+  repeated string scopes = 5;
+  bool enabled = 6;
+  google.protobuf.Timestamp created_at = 7;
+}
+
+// OAuth Provider Configuration
+message AddOAuthProviderRequest {
+  string app_id = 1;
+  string developer_id = 2;
+  string provider = 3;
+  string client_id = 4;
+  string client_secret = 5;
+  repeated string scopes = 6;
+}
+
+message AddOAuthProviderResponse { OAuthProvider provider = 1; }
+
+message GetOAuthProviderRequest {
+  string app_id = 1;
+  string provider = 2;
+}
+
+message GetOAuthProviderResponse {
+  OAuthProvider provider = 1;
+  string client_secret = 2; // used by auth service
+  bool found = 3;
+}
+
+message ListOAuthProvidersRequest {
+  string app_id = 1;
+  string developer_id = 2;
+}
+
+message ListOAuthProvidersResponse { repeated OAuthProvider providers = 1; }
+
+message UpdateOAuthProviderRequest {
+  string app_id = 1;
+  string developer_id = 2;
+  string provider = 3;
+  optional string client_id = 4;
+  optional string client_secret = 5;
+  repeated string scopes = 6;
+  optional bool enabled = 7;
+}
+
+message UpdateOAuthProviderResponse { OAuthProvider provider = 1; }
+
+message DeleteOAuthProviderRequest {
+  string app_id = 1;
+  string developer_id = 2;
+  string provider = 3;
+}
+
+message DeleteOAuthProviderResponse { bool success = 1; }

@@ -1,0 +1,275 @@
+syntax = "proto3";
+
+package user;
+
+option go_package = "github.com/ayushdevani/authservice/proto/user";
+
+import "google/protobuf/timestamp.proto";
+
+// USER SERVICE
+// Handles end-user authentication, user management, and activity logging
+
+service UserService {
+  // User CRUD
+  rpc CreateUser(CreateUserRequest) returns (CreateUserResponse);
+  rpc GetUser(GetUserRequest) returns (GetUserResponse);
+  rpc GetUserByEmail(GetUserByEmailRequest) returns (GetUserResponse);
+  rpc GetUserByProviderID(GetUserByProviderIDRequest) returns (GetUserResponse);
+  rpc UpdateUser(UpdateUserRequest) returns (UpdateUserResponse);
+  rpc DeleteUser(DeleteUserRequest) returns (DeleteUserResponse);
+  rpc ListUsers(ListUsersRequest) returns (ListUsersResponse);
+
+  // User Authentication (OAuth + Email/Password)
+  rpc InitiateOAuth(InitiateOAuthRequest) returns (InitiateOAuthResponse);
+  rpc HandleOAuthCallback(HandleOAuthCallbackRequest)
+      returns (HandleOAuthCallbackResponse);
+  rpc RegisterWithEmail(RegisterWithEmailRequest)
+      returns (RegisterWithEmailResponse);
+  rpc LoginWithEmail(LoginWithEmailRequest) returns (LoginWithEmailResponse);
+  rpc ForgotPassword(ForgotPasswordRequest) returns (ForgotPasswordResponse);
+  rpc ResetPassword(ResetPasswordRequest) returns (ResetPasswordResponse);
+  rpc VerifyEmail(VerifyEmailRequest) returns (VerifyEmailResponse);
+
+  // Session Management
+  rpc CreateSession(CreateSessionRequest) returns (CreateSessionResponse);
+  rpc GetSession(GetSessionRequest) returns (GetSessionResponse);
+  rpc RevokeSession(RevokeSessionRequest) returns (RevokeSessionResponse);
+  rpc RevokeAllSessions(RevokeAllSessionsRequest)
+      returns (RevokeAllSessionsResponse);
+  rpc ListSessions(ListSessionsRequest) returns (ListSessionsResponse);
+
+  // Activity Logging (simple - analytics service will consume these)
+  rpc LogActivity(LogActivityRequest) returns (LogActivityResponse);
+}
+
+// User entity (multi-tenant: belongs to one app)
+message User {
+  string id = 1;
+  string app_id = 2;
+  string email = 3;
+  string name = 4;
+  string avatar_url = 5;
+  string provider = 6; // "google", "github", "email"
+  string provider_user_id = 7;
+  bool email_verified = 8;
+  google.protobuf.Timestamp created_at = 9;
+  google.protobuf.Timestamp last_login_at = 10;
+}
+
+// User CRUD
+message CreateUserRequest {
+  string app_id = 1;
+  string email = 2;
+  optional string password_hash = 3;
+  optional string name = 4;
+  optional string avatar_url = 5;
+  string provider = 6;
+  optional string provider_user_id = 7;
+  bool email_verified = 8;
+}
+
+message CreateUserResponse { User user = 1; }
+
+message GetUserRequest {
+  string user_id = 1;
+  string app_id = 2;
+}
+
+message GetUserByEmailRequest {
+  string app_id = 1;
+  string email = 2;
+}
+
+message GetUserByProviderIDRequest {
+  string app_id = 1;
+  string provider = 2;
+  string provider_user_id = 3;
+}
+
+message GetUserResponse {
+  User user = 1;
+  bool found = 2;
+}
+
+message UpdateUserRequest {
+  string user_id = 1;
+  string app_id = 2;
+  optional string email = 3;
+  optional string password_hash = 4;
+  optional string name = 5;
+  optional string avatar_url = 6;
+  optional bool email_verified = 7;
+}
+
+message UpdateUserResponse { User user = 1; }
+
+message DeleteUserRequest {
+  string user_id = 1;
+  string app_id = 2;
+}
+
+message DeleteUserResponse { bool success = 1; }
+
+message ListUsersRequest {
+  string app_id = 1;
+  int32 page_size = 2;
+  string page_token = 3;
+  string provider_filter = 4;
+  string email_search = 5;
+}
+
+message ListUsersResponse {
+  repeated User users = 1;
+  string next_page_token = 2;
+  int32 total_count = 3;
+}
+
+// OAuth Authentication
+message InitiateOAuthRequest {
+  string app_id = 1;
+  string provider = 2;
+  string redirect_uri = 3;
+  string code_challenge = 4; // PKCE
+  string code_challenge_method = 5;
+}
+
+message InitiateOAuthResponse {
+  string authorization_url = 1;
+  string state = 2; // Stored in Redis
+}
+
+message HandleOAuthCallbackRequest {
+  string provider = 1;
+  string code = 2;
+  string state = 3;
+  string code_verifier = 4;
+}
+
+message HandleOAuthCallbackResponse {
+  User user = 1;
+  string app_id = 2;
+  string redirect_uri = 3;
+  bool is_new_user = 4;
+}
+
+// Email/Password Authentication
+message RegisterWithEmailRequest {
+  string app_id = 1;
+  string email = 2;
+  string password = 3;
+  string name = 4;
+}
+
+message RegisterWithEmailResponse {
+  User user = 1;
+  bool verification_sent = 2;
+}
+
+message LoginWithEmailRequest {
+  string app_id = 1;
+  string email = 2;
+  string password = 3;
+}
+
+message LoginWithEmailResponse {
+  User user = 1;
+  bool success = 2;
+  string error_message = 3;
+}
+
+message ForgotPasswordRequest {
+  string app_id = 1;
+  string email = 2;
+}
+
+message ForgotPasswordResponse { bool email_sent = 1; }
+
+message ResetPasswordRequest {
+  string app_id = 1;
+  string token = 2;
+  string new_password = 3;
+}
+
+message ResetPasswordResponse {
+  bool success = 1;
+  string error_message = 2;
+}
+
+message VerifyEmailRequest {
+  string app_id = 1;
+  string token = 2;
+}
+
+message VerifyEmailResponse {
+  bool success = 1;
+  string user_id = 2;
+}
+
+// Session entity
+message Session {
+  string id = 1;
+  string user_id = 2;
+  string app_id = 3;
+  string user_agent = 4;
+  string ip_address = 5;
+  google.protobuf.Timestamp created_at = 6;
+  google.protobuf.Timestamp expires_at = 7;
+}
+
+// Session Management
+message CreateSessionRequest {
+  string user_id = 1;
+  string app_id = 2;
+  string user_agent = 3;
+  string ip_address = 4;
+  int64 ttl_seconds = 5;
+}
+
+message CreateSessionResponse {
+  Session session = 1;
+  string refresh_token = 2;
+}
+
+message GetSessionRequest { string refresh_token_hash = 1; }
+
+message GetSessionResponse {
+  Session session = 1;
+  bool found = 2;
+  bool expired = 3;
+}
+
+message RevokeSessionRequest {
+  string session_id = 1;
+  string user_id = 2;
+}
+
+message RevokeSessionResponse { bool success = 1; }
+
+message RevokeAllSessionsRequest {
+  string user_id = 1;
+  string app_id = 2;
+  string except_session_id = 3;
+}
+
+message RevokeAllSessionsResponse { int32 revoked_count = 1; }
+
+message ListSessionsRequest {
+  string user_id = 1;
+  string app_id = 2;
+}
+
+message ListSessionsResponse { repeated Session sessions = 1; }
+
+// Activity Logging (consumed by Analytics Service)
+message LogActivityRequest {
+  string app_id = 1;
+  string user_id = 2;
+  string activity = 3;
+  string provider = 4;
+  string ip_address = 5;
+  string user_agent = 6;
+  bool success = 7;
+  string error_message = 8;
+}
+
+message LogActivityResponse { bool queued = 1; }
