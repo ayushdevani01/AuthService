@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package developer;
 
-option go_package = "github.com/ayushdevani/authservice/proto/developer";
+option go_package = "github.com/ayushdevan01/AuthService/proto/developer";
 
 import "google/protobuf/timestamp.proto";
 
