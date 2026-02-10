@@ -14,15 +14,23 @@ import (
 )
 
 func main() {
-
 	cfg := config.Load()
 
 	db := database.Connect(cfg.DatabaseURL)
 	defer db.Close()
 
-	repo := repository.NewDeveloperRepository(db)
-	svc := service.NewDeveloperService(repo, cfg.JWTSecret)
-	h := handler.NewDeveloperHandler(svc)
+	// Repositories
+	developerRepo := repository.NewDeveloperRepository(db)
+	appRepo := repository.NewAppRepository(db)
+	signingKeyRepo := repository.NewSigningKeyRepository(db, cfg.EncryptionKey)
+	oauthRepo := repository.NewOAuthProviderRepository(db)
+
+	// Services
+	developerSvc := service.NewDeveloperService(developerRepo, cfg.JWTSecret)
+	appSvc := service.NewAppService(appRepo, signingKeyRepo, oauthRepo, cfg.EncryptionKey)
+
+	// Combined handler
+	h := handler.NewCombinedHandler(developerSvc, appSvc)
 
 	grpcServer := grpc.NewServer()
 	pb.RegisterDeveloperServiceServer(grpcServer, h)
