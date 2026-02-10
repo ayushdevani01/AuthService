@@ -1,0 +1,24 @@
+package config
+
+import "os"
+
+type Config struct {
+	HTTPPort             string
+	DeveloperServiceAddr string
+	JWTSecret            string
+}
+
+func Load() *Config {
+	return &Config{
+		HTTPPort:             getEnv("HTTP_PORT", "8080"),
+		DeveloperServiceAddr: getEnv("DEVELOPER_SERVICE_ADDR", "localhost:50051"),
+		JWTSecret:            getEnv("JWT_SECRET", "dev-secret-change-in-production"),
+	}
+}
+
+func getEnv(key, fallback string) string {
+	if value := os.Getenv(key); value != "" {
+		return value
+	}
+	return fallback
+}

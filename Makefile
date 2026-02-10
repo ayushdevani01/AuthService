@@ -36,6 +36,9 @@ tidy:
 	go mod tidy
 
 # Run services
+run-gateway:
+	go run ./services/api-gateway
+
 run-developer:
 	go run ./services/developer-service
 
