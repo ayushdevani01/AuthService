@@ -3,7 +3,9 @@ package main
 import (
 	"log"
 
-	pb "github.com/ayushdevan01/AuthService/proto/developer"
+	pbDev "github.com/ayushdevan01/AuthService/proto/developer"
+	pbToken "github.com/ayushdevan01/AuthService/proto/token"
+	pbUser "github.com/ayushdevan01/AuthService/proto/user"
 	"github.com/ayushdevan01/AuthService/services/api-gateway/config"
 	"github.com/ayushdevan01/AuthService/services/api-gateway/middleware"
 	"github.com/ayushdevan01/AuthService/services/api-gateway/routes"
@@ -15,18 +17,40 @@ import (
 func main() {
 	cfg := config.Load()
 
+	// Developer Service connection
 	devConn, err := grpc.NewClient(cfg.DeveloperServiceAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		log.Fatalf("Failed to connect to Developer Service: %v", err)
 	}
 	defer devConn.Close()
 
-	devClient := pb.NewDeveloperServiceClient(devConn)
+	// User Service connection
+	userConn, err := grpc.NewClient(cfg.UserServiceAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		log.Fatalf("Failed to connect to User Service: %v", err)
+	}
+	defer userConn.Close()
+
+	// Token Service connection
+	tokenConn, err := grpc.NewClient(cfg.TokenServiceAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		log.Fatalf("Failed to connect to Token Service: %v", err)
+	}
+	defer tokenConn.Close()
+
+	// gRPC clients
+	devClient := pbDev.NewDeveloperServiceClient(devConn)
+	userClient := pbUser.NewUserServiceClient(userConn)
+	tokenClient := pbToken.NewTokenServiceClient(tokenConn)
+
+	// Route handlers
 	devRoutes := routes.NewDeveloperRoutes(devClient)
+	authRoutes := routes.NewAuthRoutes(userClient, tokenClient)
 
 	r := gin.Default()
 	r.Use(middleware.CORSMiddleware())
 
+	// Developer routes (existing)
 	dev := r.Group("/api/dev")
 	{
 		// Public routes
@@ -58,6 +82,21 @@ func main() {
 			auth.PATCH("/apps/:id/providers/:provider", devRoutes.UpdateOAuthProvider)
 			auth.DELETE("/apps/:id/providers/:provider", devRoutes.DeleteOAuthProvider)
 		}
+	}
+
+	// OAuth & Auth routes (new - end-user facing)
+	oauth := r.Group("/oauth")
+	{
+		oauth.GET("/authorize", authRoutes.Authorize)
+		oauth.GET("/callback/:provider", authRoutes.Callback)
+		oauth.POST("/refresh", authRoutes.RefreshTokens)
+		oauth.POST("/revoke", authRoutes.RevokeToken)
+	}
+
+	// Public API routes
+	api := r.Group("/api/v1")
+	{
+		api.GET("/apps/:app_id/jwks", authRoutes.JWKS)
 	}
 
 	log.Printf("API Gateway listening on port %s", cfg.HTTPPort)
