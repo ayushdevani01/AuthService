@@ -5,6 +5,8 @@ import "os"
 type Config struct {
 	HTTPPort             string
 	DeveloperServiceAddr string
+	UserServiceAddr      string
+	TokenServiceAddr     string
 	JWTSecret            string
 }
 
@@ -12,6 +14,8 @@ func Load() *Config {
 	return &Config{
 		HTTPPort:             getEnv("HTTP_PORT", "8080"),
 		DeveloperServiceAddr: getEnv("DEVELOPER_SERVICE_ADDR", "localhost:50051"),
+		UserServiceAddr:      getEnv("USER_SERVICE_ADDR", "localhost:50053"),
+		TokenServiceAddr:     getEnv("TOKEN_SERVICE_ADDR", "localhost:50052"),
 		JWTSecret:            getEnv("JWT_SECRET", "dev-secret-change-in-production"),
 	}
 }

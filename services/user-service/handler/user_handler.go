@@ -1,0 +1,282 @@
+package handler
+
+import (
+	"context"
+	"errors"
+
+	pb "github.com/ayushdevan01/AuthService/proto/user"
+	"github.com/ayushdevan01/AuthService/services/user-service/repository"
+	"github.com/ayushdevan01/AuthService/services/user-service/service"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/timestamppb"
+)
+
+type UserHandler struct {
+	pb.UnimplementedUserServiceServer
+	userService    *service.UserService
+	oauthService   *service.OAuthService
+	sessionService *service.SessionService
+}
+
+func NewUserHandler(userService *service.UserService, oauthService *service.OAuthService, sessionService *service.SessionService) *UserHandler {
+	return &UserHandler{
+		userService:    userService,
+		oauthService:   oauthService,
+		sessionService: sessionService,
+	}
+}
+
+// --- User CRUD ---
+
+func (h *UserHandler) CreateUser(ctx context.Context, req *pb.CreateUserRequest) (*pb.CreateUserResponse, error) {
+	user, err := h.userService.CreateUser(
+		ctx, req.AppId, req.Email,
+		derefStr(req.Name), derefStr(req.AvatarUrl),
+		req.Provider, req.ProviderUserId, req.PasswordHash,
+		req.EmailVerified,
+	)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to create user: %v", err)
+	}
+	return &pb.CreateUserResponse{User: toProtoUser(user)}, nil
+}
+
+func (h *UserHandler) GetUser(ctx context.Context, req *pb.GetUserRequest) (*pb.GetUserResponse, error) {
+	user, err := h.userService.GetUser(ctx, req.UserId, req.AppId)
+	if err != nil {
+		if errors.Is(err, service.ErrUserNotFound) {
+			return &pb.GetUserResponse{Found: false}, nil
+		}
+		return nil, status.Errorf(codes.Internal, "failed to get user: %v", err)
+	}
+	return &pb.GetUserResponse{User: toProtoUser(user), Found: true}, nil
+}
+
+func (h *UserHandler) GetUserByEmail(ctx context.Context, req *pb.GetUserByEmailRequest) (*pb.GetUserResponse, error) {
+	user, err := h.userService.GetUserByEmail(ctx, req.AppId, req.Email)
+	if err != nil {
+		if errors.Is(err, service.ErrUserNotFound) {
+			return &pb.GetUserResponse{Found: false}, nil
+		}
+		return nil, status.Errorf(codes.Internal, "failed to get user: %v", err)
+	}
+	return &pb.GetUserResponse{User: toProtoUser(user), Found: true}, nil
+}
+
+func (h *UserHandler) GetUserByProviderID(ctx context.Context, req *pb.GetUserByProviderIDRequest) (*pb.GetUserResponse, error) {
+	user, err := h.userService.GetUserByProviderID(ctx, req.AppId, req.Provider, req.ProviderUserId)
+	if err != nil {
+		if errors.Is(err, service.ErrUserNotFound) {
+			return &pb.GetUserResponse{Found: false}, nil
+		}
+		return nil, status.Errorf(codes.Internal, "failed to get user: %v", err)
+	}
+	return &pb.GetUserResponse{User: toProtoUser(user), Found: true}, nil
+}
+
+func (h *UserHandler) UpdateUser(ctx context.Context, req *pb.UpdateUserRequest) (*pb.UpdateUserResponse, error) {
+	user, err := h.userService.UpdateUser(
+		ctx, req.UserId, req.AppId,
+		req.Email, req.Name, req.AvatarUrl, req.EmailVerified,
+	)
+	if err != nil {
+		if errors.Is(err, service.ErrUserNotFound) {
+			return nil, status.Errorf(codes.NotFound, "user not found")
+		}
+		return nil, status.Errorf(codes.Internal, "failed to update user: %v", err)
+	}
+	return &pb.UpdateUserResponse{User: toProtoUser(user)}, nil
+}
+
+func (h *UserHandler) DeleteUser(ctx context.Context, req *pb.DeleteUserRequest) (*pb.DeleteUserResponse, error) {
+	err := h.userService.DeleteUser(ctx, req.UserId, req.AppId)
+	if err != nil {
+		if errors.Is(err, service.ErrUserNotFound) {
+			return &pb.DeleteUserResponse{Success: false}, nil
+		}
+		return nil, status.Errorf(codes.Internal, "failed to delete user: %v", err)
+	}
+	return &pb.DeleteUserResponse{Success: true}, nil
+}
+
+func (h *UserHandler) ListUsers(ctx context.Context, req *pb.ListUsersRequest) (*pb.ListUsersResponse, error) {
+	users, nextPageToken, totalCount, err := h.userService.ListUsers(
+		ctx, req.AppId, int(req.PageSize), req.PageToken, req.ProviderFilter, req.EmailSearch,
+	)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to list users: %v", err)
+	}
+
+	protoUsers := make([]*pb.User, 0, len(users))
+	for _, u := range users {
+		protoUsers = append(protoUsers, toProtoUser(u))
+	}
+
+	return &pb.ListUsersResponse{
+		Users:         protoUsers,
+		NextPageToken: nextPageToken,
+		TotalCount:    int32(totalCount),
+	}, nil
+}
+
+// --- OAuth ---
+
+func (h *UserHandler) InitiateOAuth(ctx context.Context, req *pb.InitiateOAuthRequest) (*pb.InitiateOAuthResponse, error) {
+	authURL, state, err := h.oauthService.InitiateOAuth(ctx, req.AppId, req.Provider, req.RedirectUri)
+	if err != nil {
+		if errors.Is(err, service.ErrProviderNotConf) {
+			return nil, status.Errorf(codes.NotFound, "OAuth provider not configured: %s", req.Provider)
+		}
+		return nil, status.Errorf(codes.Internal, "failed to initiate OAuth: %v", err)
+	}
+	return &pb.InitiateOAuthResponse{
+		AuthorizationUrl: authURL,
+		State:            state,
+	}, nil
+}
+
+func (h *UserHandler) HandleOAuthCallback(ctx context.Context, req *pb.HandleOAuthCallbackRequest) (*pb.HandleOAuthCallbackResponse, error) {
+	user, appID, redirectURI, isNewUser, err := h.oauthService.HandleOAuthCallback(ctx, req.Provider, req.Code, req.State)
+	if err != nil {
+		if errors.Is(err, service.ErrInvalidState) {
+			return nil, status.Errorf(codes.InvalidArgument, "invalid or expired OAuth state")
+		}
+		return nil, status.Errorf(codes.Internal, "OAuth callback failed: %v", err)
+	}
+	return &pb.HandleOAuthCallbackResponse{
+		User:        toProtoUser(user),
+		AppId:       appID,
+		RedirectUri: redirectURI,
+		IsNewUser:   isNewUser,
+	}, nil
+}
+
+// Email/Password Auth
+
+func (h *UserHandler) RegisterWithEmail(ctx context.Context, req *pb.RegisterWithEmailRequest) (*pb.RegisterWithEmailResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "RegisterWithEmail not yet implemented")
+}
+
+func (h *UserHandler) LoginWithEmail(ctx context.Context, req *pb.LoginWithEmailRequest) (*pb.LoginWithEmailResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "LoginWithEmail not yet implemented")
+}
+
+func (h *UserHandler) ForgotPassword(ctx context.Context, req *pb.ForgotPasswordRequest) (*pb.ForgotPasswordResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "ForgotPassword not yet implemented")
+}
+
+func (h *UserHandler) ResetPassword(ctx context.Context, req *pb.ResetPasswordRequest) (*pb.ResetPasswordResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "ResetPassword not yet implemented")
+}
+
+func (h *UserHandler) VerifyEmail(ctx context.Context, req *pb.VerifyEmailRequest) (*pb.VerifyEmailResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "VerifyEmail not yet implemented")
+}
+
+// Session Management
+
+func (h *UserHandler) CreateSession(ctx context.Context, req *pb.CreateSessionRequest) (*pb.CreateSessionResponse, error) {
+	result, err := h.sessionService.CreateSession(ctx, req.UserId, req.AppId, req.UserAgent, req.IpAddress, req.TtlSeconds)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to create session: %v", err)
+	}
+	return &pb.CreateSessionResponse{
+		Session:      toProtoSession(result.Session),
+		RefreshToken: result.RefreshToken,
+	}, nil
+}
+
+func (h *UserHandler) GetSession(ctx context.Context, req *pb.GetSessionRequest) (*pb.GetSessionResponse, error) {
+	session, found, expired, err := h.sessionService.GetSession(ctx, req.RefreshTokenHash)
+	if err != nil {
+		return &pb.GetSessionResponse{Found: false}, nil
+	}
+	if !found {
+		return &pb.GetSessionResponse{Found: false}, nil
+	}
+	return &pb.GetSessionResponse{
+		Session: toProtoSession(session),
+		Found:   true,
+		Expired: expired,
+	}, nil
+}
+
+func (h *UserHandler) RevokeSession(ctx context.Context, req *pb.RevokeSessionRequest) (*pb.RevokeSessionResponse, error) {
+	err := h.sessionService.RevokeSession(ctx, req.SessionId, req.UserId)
+	if err != nil {
+		return &pb.RevokeSessionResponse{Success: false}, nil
+	}
+	return &pb.RevokeSessionResponse{Success: true}, nil
+}
+
+func (h *UserHandler) RevokeAllSessions(ctx context.Context, req *pb.RevokeAllSessionsRequest) (*pb.RevokeAllSessionsResponse, error) {
+	count, err := h.sessionService.RevokeAllSessions(ctx, req.UserId, req.AppId, req.ExceptSessionId)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to revoke sessions: %v", err)
+	}
+	return &pb.RevokeAllSessionsResponse{RevokedCount: int32(count)}, nil
+}
+
+func (h *UserHandler) ListSessions(ctx context.Context, req *pb.ListSessionsRequest) (*pb.ListSessionsResponse, error) {
+	sessions, err := h.sessionService.ListSessions(ctx, req.UserId, req.AppId)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to list sessions: %v", err)
+	}
+
+	protoSessions := make([]*pb.Session, 0, len(sessions))
+	for _, s := range sessions {
+		protoSessions = append(protoSessions, toProtoSession(s))
+	}
+
+	return &pb.ListSessionsResponse{Sessions: protoSessions}, nil
+}
+
+// Activity Logging
+
+func (h *UserHandler) LogActivity(ctx context.Context, req *pb.LogActivityRequest) (*pb.LogActivityResponse, error) {
+	return &pb.LogActivityResponse{Queued: true}, nil
+}
+
+// --- Helpers ---
+
+func toProtoUser(u *repository.User) *pb.User {
+	if u == nil {
+		return nil
+	}
+	protoUser := &pb.User{
+		Id:            u.ID,
+		AppId:         u.AppID,
+		Email:         u.Email,
+		Name:          u.Name,
+		AvatarUrl:     u.AvatarURL,
+		EmailVerified: u.EmailVerified,
+		CreatedAt:     timestamppb.New(u.CreatedAt),
+	}
+	if u.LastLoginAt != nil {
+		protoUser.LastLoginAt = timestamppb.New(*u.LastLoginAt)
+	}
+	return protoUser
+}
+
+func toProtoSession(s *repository.Session) *pb.Session {
+	if s == nil {
+		return nil
+	}
+	return &pb.Session{
+		Id:        s.ID,
+		UserId:    s.UserID,
+		AppId:     s.AppID,
+		UserAgent: s.UserAgent,
+		IpAddress: s.IPAddress,
+		CreatedAt: timestamppb.New(s.CreatedAt),
+		ExpiresAt: timestamppb.New(s.ExpiresAt),
+	}
+}
+
+func derefStr(s *string) string {
+	if s == nil {
+		return ""
+	}
+	return *s
+}
