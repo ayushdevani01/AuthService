@@ -2,18 +2,24 @@ package routes
 
 import (
 	"net/http"
+	"strconv"
 
 	pb "github.com/ayushdevan01/AuthService/proto/developer"
+	pbUser "github.com/ayushdevan01/AuthService/proto/user"
 	"github.com/gin-gonic/gin"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 type DeveloperRoutes struct {
-	client pb.DeveloperServiceClient
+	client     pb.DeveloperServiceClient
+	userClient pbUser.UserServiceClient
 }
 
-func NewDeveloperRoutes(client pb.DeveloperServiceClient) *DeveloperRoutes {
-	return &DeveloperRoutes{client: client}
+func NewDeveloperRoutes(client pb.DeveloperServiceClient, userClient pbUser.UserServiceClient) *DeveloperRoutes {
+	return &DeveloperRoutes{
+		client:     client,
+		userClient: userClient,
+	}
 }
 
 func (dr *DeveloperRoutes) Register(c *gin.Context) {
@@ -494,4 +500,39 @@ func formatTimestamp(ts *timestamppb.Timestamp) *string {
 	}
 	s := ts.AsTime().Format("2006-01-02T15:04:05Z")
 	return &s
+}
+
+// GET /api/v1/apps/:id/users
+func (dr *DeveloperRoutes) ListUsers(c *gin.Context) {
+	appID := c.Param("id")
+	if appID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "app ID required"})
+		return
+	}
+
+	pageSizeStr := c.Query("page_size")
+	pageToken := c.Query("page_token")
+	providerFilter := c.Query("provider_filter")
+	emailSearch := c.Query("email_search")
+
+	var pageSize int32 = 50
+	if pageSizeStr != "" {
+		if val, err := strconv.Atoi(pageSizeStr); err == nil && val > 0 {
+			pageSize = int32(val)
+		}
+	}
+
+	resp, err := dr.userClient.ListUsers(c.Request.Context(), &pbUser.ListUsersRequest{
+		AppId:          appID,
+		PageSize:       pageSize,
+		PageToken:      pageToken,
+		ProviderFilter: providerFilter,
+		EmailSearch:    emailSearch,
+	})
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, resp)
 }

@@ -14,16 +14,29 @@ import (
 
 type UserHandler struct {
 	pb.UnimplementedUserServiceServer
-	userService    *service.UserService
-	oauthService   *service.OAuthService
-	sessionService *service.SessionService
+	userService          *service.UserService
+	oauthService         *service.OAuthService
+	sessionService       *service.SessionService
+	passwordResetService *service.PasswordResetService
+	emailService         *service.EmailService
+	emailVerifService    *service.EmailVerificationService
 }
 
-func NewUserHandler(userService *service.UserService, oauthService *service.OAuthService, sessionService *service.SessionService) *UserHandler {
+func NewUserHandler(
+	userService *service.UserService,
+	oauthService *service.OAuthService,
+	sessionService *service.SessionService,
+	passwordResetService *service.PasswordResetService,
+	emailService *service.EmailService,
+	emailVerifService *service.EmailVerificationService,
+) *UserHandler {
 	return &UserHandler{
-		userService:    userService,
-		oauthService:   oauthService,
-		sessionService: sessionService,
+		userService:          userService,
+		oauthService:         oauthService,
+		sessionService:       sessionService,
+		passwordResetService: passwordResetService,
+		emailService:         emailService,
+		emailVerifService:    emailVerifService,
 	}
 }
 
@@ -155,23 +168,77 @@ func (h *UserHandler) HandleOAuthCallback(ctx context.Context, req *pb.HandleOAu
 // Email/Password Auth
 
 func (h *UserHandler) RegisterWithEmail(ctx context.Context, req *pb.RegisterWithEmailRequest) (*pb.RegisterWithEmailResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "RegisterWithEmail not yet implemented")
+	user, err := h.userService.RegisterWithEmail(ctx, req.AppId, req.Email, req.Password, req.Name)
+	if err != nil {
+		if errors.Is(err, service.ErrUserExists) {
+			return nil, status.Errorf(codes.AlreadyExists, "user already exists with this email")
+		}
+		return nil, status.Errorf(codes.Internal, "registration failed: %v", err)
+	}
+
+	// Send verification email (non-blocking, uses secure random token)
+	go h.emailVerifService.SendVerification(ctx, req.AppId, user.ID, user.Email, user.Name)
+
+	return &pb.RegisterWithEmailResponse{
+		User:             toProtoUser(user),
+		VerificationSent: true,
+	}, nil
 }
 
 func (h *UserHandler) LoginWithEmail(ctx context.Context, req *pb.LoginWithEmailRequest) (*pb.LoginWithEmailResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "LoginWithEmail not yet implemented")
+	user, err := h.userService.LoginWithEmail(ctx, req.AppId, req.Email, req.Password)
+	if err != nil {
+		switch {
+		case errors.Is(err, service.ErrAccountBlocked):
+			return &pb.LoginWithEmailResponse{
+				Success:      false,
+				ErrorMessage: "account temporarily blocked — too many failed attempts",
+			}, nil
+		case errors.Is(err, service.ErrInvalidPassword):
+			return &pb.LoginWithEmailResponse{
+				Success:      false,
+				ErrorMessage: "invalid email or password",
+			}, nil
+		default:
+			return nil, status.Errorf(codes.Internal, "login failed: %v", err)
+		}
+	}
+	return &pb.LoginWithEmailResponse{
+		User:    toProtoUser(user),
+		Success: true,
+	}, nil
 }
 
 func (h *UserHandler) ForgotPassword(ctx context.Context, req *pb.ForgotPasswordRequest) (*pb.ForgotPasswordResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "ForgotPassword not yet implemented")
+	// Always returns success to avoid leaking whether the email exists
+	h.passwordResetService.InitiateReset(ctx, req.AppId, req.Email)
+	return &pb.ForgotPasswordResponse{EmailSent: true}, nil
 }
 
 func (h *UserHandler) ResetPassword(ctx context.Context, req *pb.ResetPasswordRequest) (*pb.ResetPasswordResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "ResetPassword not yet implemented")
+	err := h.passwordResetService.ResetPassword(ctx, req.AppId, req.Token, req.NewPassword)
+	if err != nil {
+		switch {
+		case errors.Is(err, service.ErrResetTokenInvalid):
+			return &pb.ResetPasswordResponse{Success: false, ErrorMessage: "invalid or expired reset token"}, nil
+		case errors.Is(err, service.ErrResetTokenUsed):
+			return &pb.ResetPasswordResponse{Success: false, ErrorMessage: "reset token already used"}, nil
+		default:
+			return nil, status.Errorf(codes.Internal, "password reset failed: %v", err)
+		}
+	}
+	return &pb.ResetPasswordResponse{Success: true}, nil
 }
 
 func (h *UserHandler) VerifyEmail(ctx context.Context, req *pb.VerifyEmailRequest) (*pb.VerifyEmailResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "VerifyEmail not yet implemented")
+	userID, err := h.emailVerifService.VerifyEmail(ctx, req.AppId, req.Token)
+	if err != nil {
+		if errors.Is(err, service.ErrVerifyTokenInvalid) {
+			return &pb.VerifyEmailResponse{Success: false}, nil
+		}
+		return nil, status.Errorf(codes.Internal, "verification failed: %v", err)
+	}
+	return &pb.VerifyEmailResponse{Success: true, UserId: userID}, nil
 }
 
 // Session Management
