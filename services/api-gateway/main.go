@@ -44,7 +44,7 @@ func main() {
 	tokenClient := pbToken.NewTokenServiceClient(tokenConn)
 
 	// Route handlers
-	devRoutes := routes.NewDeveloperRoutes(devClient)
+	devRoutes := routes.NewDeveloperRoutes(devClient, userClient)
 	authRoutes := routes.NewAuthRoutes(userClient, tokenClient)
 
 	r := gin.Default()
@@ -71,6 +71,9 @@ func main() {
 			auth.PATCH("/apps/:id", devRoutes.UpdateApp)
 			auth.DELETE("/apps/:id", devRoutes.DeleteApp)
 
+			// App Users
+			auth.GET("/apps/:id/users", devRoutes.ListUsers)
+
 			// Key management
 			auth.POST("/apps/:id/rotate-secret", devRoutes.RotateApiKey)
 			auth.POST("/apps/:id/rotate-keys", devRoutes.RotateSigningKeys)
@@ -93,10 +96,22 @@ func main() {
 		oauth.POST("/revoke", authRoutes.RevokeToken)
 	}
 
+	// Email/Password auth routes
+	auth := r.Group("/auth")
+	{
+		auth.POST("/register", authRoutes.Register)
+		auth.POST("/login", authRoutes.LoginWithEmail)
+		auth.POST("/forgot-password", authRoutes.ForgotPassword)
+		auth.POST("/reset-password", authRoutes.ResetPassword)
+		auth.POST("/verify-email", authRoutes.VerifyEmail)
+	}
+
 	// Public API routes
 	api := r.Group("/api/v1")
 	{
 		api.GET("/apps/:app_id/jwks", authRoutes.JWKS)
+		api.POST("/verify", authRoutes.VerifyToken)
+		api.GET("/userinfo", authRoutes.UserInfo)
 	}
 
 	log.Printf("API Gateway listening on port %s", cfg.HTTPPort)

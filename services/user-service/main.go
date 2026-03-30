@@ -26,14 +26,18 @@ func main() {
 	userRepo := repository.NewUserRepository(db)
 	identityRepo := repository.NewIdentityRepository(db)
 	sessionRepo := repository.NewSessionRepository(db, redisClient)
+	resetRepo := repository.NewPasswordResetRepository(db)
 
 	// Services
-	userSvc := service.NewUserService(userRepo, identityRepo)
+	rateLimiter := service.NewLoginRateLimiter(redisClient)
+	emailSvc := service.NewEmailService(cfg.ResendAPIKey, cfg.PlatformURL, cfg.EmailFrom)
+	userSvc := service.NewUserService(userRepo, identityRepo, rateLimiter)
 	oauthSvc := service.NewOAuthService(redisClient, db, userSvc, cfg.EncryptionKey, "http://localhost:8080")
 	sessionSvc := service.NewSessionService(sessionRepo)
+	resetSvc := service.NewPasswordResetService(resetRepo, identityRepo, userRepo, emailSvc, redisClient)
+	emailVerifSvc := service.NewEmailVerificationService(userRepo, emailSvc, redisClient)
 
-	// Handler
-	h := handler.NewUserHandler(userSvc, oauthSvc, sessionSvc)
+	h := handler.NewUserHandler(userSvc, oauthSvc, sessionSvc, resetSvc, emailSvc, emailVerifSvc)
 
 	grpcServer := grpc.NewServer()
 	pb.RegisterUserServiceServer(grpcServer, h)

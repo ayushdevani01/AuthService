@@ -7,23 +7,27 @@ import (
 
 	"github.com/ayushdevan01/AuthService/services/user-service/repository"
 	"github.com/jackc/pgx/v5"
+	"golang.org/x/crypto/bcrypt"
 )
 
 var (
 	ErrUserNotFound    = errors.New("user not found")
 	ErrUserExists      = errors.New("user already exists")
 	ErrInvalidPassword = errors.New("invalid password")
+	ErrAccountBlocked  = errors.New("account temporarily blocked due to too many failed login attempts")
 )
 
 type UserService struct {
-	userRepo     *repository.UserRepository
+	userRepo    *repository.UserRepository
 	identityRepo *repository.IdentityRepository
+	rateLimiter  *LoginRateLimiter
 }
 
-func NewUserService(userRepo *repository.UserRepository, identityRepo *repository.IdentityRepository) *UserService {
+func NewUserService(userRepo *repository.UserRepository, identityRepo *repository.IdentityRepository, rateLimiter *LoginRateLimiter) *UserService {
 	return &UserService{
 		userRepo:     userRepo,
 		identityRepo: identityRepo,
+		rateLimiter:  rateLimiter,
 	}
 }
 
@@ -151,4 +155,74 @@ func (s *UserService) ListUsers(ctx context.Context, appID string, pageSize int,
 	}
 
 	return users, nextPageToken, totalCount, nil
+}
+
+func (s *UserService) RegisterWithEmail(ctx context.Context, appID, email, password, name string) (*repository.User, error) {
+	// Check if user already has an email identity for this app
+	existing, err := s.userRepo.FindByEmail(ctx, appID, email)
+	if err == nil && existing != nil {
+		_, identErr := s.identityRepo.FindByUserAndProvider(ctx, existing.ID, "email")
+		if identErr == nil {
+			return nil, ErrUserExists
+		}
+	}
+
+	hash, err := hashPassword(password)
+	if err != nil {
+		return nil, err
+	}
+
+	user, err := s.userRepo.Create(ctx, appID, email, name, "", false)
+	if err != nil {
+		return nil, err
+	}
+
+	_, err = s.identityRepo.Create(ctx, user.ID, "email", nil, &hash)
+	if err != nil {
+		return nil, err
+	}
+
+	return user, nil
+}
+
+func (s *UserService) LoginWithEmail(ctx context.Context, appID, email, password string) (*repository.User, error) {
+	blocked, err := s.rateLimiter.IsBlocked(ctx, appID, email)
+	if err != nil {
+		return nil, err
+	}
+	if blocked {
+		return nil, ErrAccountBlocked
+	}
+
+	user, err := s.userRepo.FindByEmail(ctx, appID, email)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			s.rateLimiter.RecordFailure(ctx, appID, email)
+			return nil, ErrInvalidPassword
+		}
+		return nil, err
+	}
+
+	identity, err := s.identityRepo.FindByUserAndProvider(ctx, user.ID, "email")
+	if err != nil || identity.PasswordHash == nil {
+		s.rateLimiter.RecordFailure(ctx, appID, email)
+		return nil, ErrInvalidPassword
+	}
+
+	if err := bcrypt.CompareHashAndPassword([]byte(*identity.PasswordHash), []byte(password)); err != nil {
+		s.rateLimiter.RecordFailure(ctx, appID, email)
+		return nil, ErrInvalidPassword
+	}
+
+	s.rateLimiter.ClearFailures(ctx, appID, email)
+	s.userRepo.UpdateLastLogin(ctx, user.ID)
+	return user, nil
+}
+
+func hashPassword(password string) (string, error) {
+	bytes, err := bcrypt.GenerateFromPassword([]byte(password), 12)
+	if err != nil {
+		return "", err
+	}
+	return string(bytes), nil
 }
