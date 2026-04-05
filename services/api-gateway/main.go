@@ -10,12 +10,19 @@ import (
 	"github.com/ayushdevan01/AuthService/services/api-gateway/middleware"
 	"github.com/ayushdevan01/AuthService/services/api-gateway/routes"
 	"github.com/gin-gonic/gin"
+	"github.com/redis/go-redis/v9"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
 
 func main() {
 	cfg := config.Load()
+
+	// Redis connection
+	redisClient := redis.NewClient(&redis.Options{
+		Addr: cfg.RedisURL,
+	})
+	defer redisClient.Close()
 
 	// Developer Service connection
 	devConn, err := grpc.NewClient(cfg.DeveloperServiceAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
@@ -43,15 +50,21 @@ func main() {
 	userClient := pbUser.NewUserServiceClient(userConn)
 	tokenClient := pbToken.NewTokenServiceClient(tokenConn)
 
+	// App resolver for app_id to UUID resolution
+	appResolver := middleware.NewAppResolver(redisClient, devClient)
+
 	// Route handlers
 	devRoutes := routes.NewDeveloperRoutes(devClient, userClient)
-	authRoutes := routes.NewAuthRoutes(userClient, tokenClient)
+	authRoutes := routes.NewAuthRoutes(devClient, userClient, tokenClient, appResolver)
 
 	r := gin.Default()
+	if err := r.SetTrustedProxies(nil); err != nil {
+		log.Fatalf("Failed to configure trusted proxies: %v", err)
+	}
 	r.Use(middleware.CORSMiddleware())
 
 	// Developer routes (existing)
-	dev := r.Group("/api/dev")
+	dev := r.Group("/api/v1/developers")
 	{
 		// Public routes
 		dev.POST("/register", devRoutes.Register)

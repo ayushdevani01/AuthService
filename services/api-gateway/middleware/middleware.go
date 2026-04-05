@@ -45,7 +45,12 @@ func AuthMiddleware(jwtSecret string) gin.HandlerFunc {
 			return
 		}
 
-		developerID, _ := claims["developer_id"].(string)
+		developerID, ok := claims["developer_id"].(string)
+		if !ok || developerID == "" {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "missing or invalid developer_id claim"})
+			c.Abort()
+			return
+		}
 		email, _ := claims["email"].(string)
 
 		c.Set("developer_id", developerID)
@@ -57,7 +62,7 @@ func AuthMiddleware(jwtSecret string) gin.HandlerFunc {
 func CORSMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		c.Header("Access-Control-Allow-Origin", "*")
-		c.Header("Access-Control-Allow-Methods", "GET, POST, PATCH, DELETE, OPTIONS")
+		c.Header("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
 		c.Header("Access-Control-Allow-Headers", "Content-Type, Authorization")
 
 		if c.Request.Method == "OPTIONS" {
