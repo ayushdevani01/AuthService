@@ -29,6 +29,90 @@ services:
       timeout: 5s
       retries: 5
 
+  migrate:
+    build:
+      context: ./migrations
+      dockerfile: Dockerfile
+    container_name: authservice-migrate
+    volumes:
+      - ./migrations:/migrations
+    command:
+      - -path=/migrations
+      - -database=postgres://authservice:authservice@postgres:5432/authservice?sslmode=disable
+      - up
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  developer-service:
+    build:
+      context: .
+      dockerfile: services/developer-service/Dockerfile
+    container_name: developer-service
+    environment:
+      - DATABASE_URL=postgres://authservice:authservice@postgres:5432/authservice?sslmode=disable
+      - GRPC_PORT=50051
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY}
+      - JWT_SECRET=${JWT_SECRET}
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  token-service:
+    build:
+      context: .
+      dockerfile: services/token-service/Dockerfile
+    container_name: token-service
+    environment:
+      - DATABASE_URL=postgres://authservice:authservice@postgres:5432/authservice?sslmode=disable
+      - GRPC_PORT=50052
+      - REDIS_URL=redis:6379
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY}
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+
+  user-service:
+    build:
+      context: .
+      dockerfile: services/user-service/Dockerfile
+    container_name: user-service
+    environment:
+      - DATABASE_URL=postgres://authservice:authservice@postgres:5432/authservice?sslmode=disable
+      - GRPC_PORT=50053
+      - REDIS_URL=redis:6379
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY}
+      - RESEND_API_KEY=${RESEND_API_KEY}
+      - PLATFORM_URL=${PLATFORM_URL}
+      - API_PUBLIC_URL=http://localhost:8080
+      - EMAIL_FROM=${EMAIL_FROM}
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+
+  api-gateway:
+    build:
+      context: .
+      dockerfile: services/api-gateway/Dockerfile
+    container_name: api-gateway
+    environment:
+      - HTTP_PORT=8080
+      - REDIS_URL=redis:6379
+      - DEVELOPER_SERVICE_ADDR=developer-service:50051
+      - TOKEN_SERVICE_ADDR=token-service:50052
+      - USER_SERVICE_ADDR=user-service:50053
+      - JWT_SECRET=${JWT_SECRET}
+    ports:
+      - "8080:8080"
+    depends_on:
+      - developer-service
+      - token-service
+      - user-service
+
 volumes:
   postgres_data:
   redis_data:
