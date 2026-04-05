@@ -29,8 +29,8 @@ func NewEmailService(apiKey, platformURL, fromAddress string) *EmailService {
 	}
 }
 
-func (s *EmailService) SendPasswordReset(ctx context.Context, toEmail, userName, rawToken string) error {
-	resetLink := fmt.Sprintf("%s/reset-password?token=%s", s.platformURL, rawToken)
+func (s *EmailService) SendPasswordReset(ctx context.Context, appID, toEmail, userName, rawToken string) error {
+	resetLink := fmt.Sprintf("%s/?mode=reset&app_id=%s&token=%s", s.platformURL, appID, rawToken)
 
 	html := fmt.Sprintf(`
 <!DOCTYPE html>
@@ -60,8 +60,8 @@ func (s *EmailService) SendPasswordReset(ctx context.Context, toEmail, userName,
 	return err
 }
 
-func (s *EmailService) SendEmailVerification(ctx context.Context, toEmail, userName, verifyToken string) error {
-	verifyLink := fmt.Sprintf("%s/verify-email?token=%s", s.platformURL, verifyToken)
+func (s *EmailService) SendEmailVerification(ctx context.Context, appID, toEmail, userName, verifyToken string) error {
+	verifyLink := fmt.Sprintf("%s/?mode=verify&app_id=%s&token=%s", s.platformURL, appID, verifyToken)
 
 	html := fmt.Sprintf(`
 <!DOCTYPE html>

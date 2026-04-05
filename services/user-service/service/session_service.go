@@ -57,8 +57,8 @@ func (s *SessionService) GetSession(ctx context.Context, refreshTokenHash string
 	return session, true, expired, nil
 }
 
-func (s *SessionService) RevokeSession(ctx context.Context, sessionID, userID string) error {
-	return s.sessionRepo.Revoke(ctx, sessionID, userID)
+func (s *SessionService) RevokeSession(ctx context.Context, userID, sessionID string) error {
+	return s.sessionRepo.Revoke(ctx, userID, sessionID)
 }
 
 func (s *SessionService) RevokeAllSessions(ctx context.Context, userID, appID, exceptSessionID string) (int, error) {

@@ -43,11 +43,11 @@ func (r *IdentityRepository) Create(ctx context.Context, userID, provider string
 func (r *IdentityRepository) FindByProviderID(ctx context.Context, provider, providerUserID string) (*Identity, error) {
 	identity := &Identity{}
 	err := r.db.QueryRow(ctx, `
-		SELECT id, user_id, provider, provider_user_id, password_hash, created_at
+		SELECT id, user_id, provider, provider_user_id, created_at
 		FROM user_identities WHERE provider = $1 AND provider_user_id = $2
 	`, provider, providerUserID).Scan(
 		&identity.ID, &identity.UserID, &identity.Provider,
-		&identity.ProviderUserID, &identity.PasswordHash, &identity.CreatedAt,
+		&identity.ProviderUserID, &identity.CreatedAt,
 	)
 	if err != nil {
 		return nil, err
@@ -63,6 +63,21 @@ func (r *IdentityRepository) FindByUserAndProvider(ctx context.Context, userID, 
 	`, userID, provider).Scan(
 		&identity.ID, &identity.UserID, &identity.Provider,
 		&identity.ProviderUserID, &identity.PasswordHash, &identity.CreatedAt,
+	)
+	if err != nil {
+		return nil, err
+	}
+	return identity, nil
+}
+
+func (r *IdentityRepository) FindLatestByUserID(ctx context.Context, userID string) (*Identity, error) {
+	identity := &Identity{}
+	err := r.db.QueryRow(ctx, `
+		SELECT id, user_id, provider, provider_user_id, created_at
+		FROM user_identities WHERE user_id = $1 ORDER BY created_at DESC LIMIT 1
+	`, userID).Scan(
+		&identity.ID, &identity.UserID, &identity.Provider,
+		&identity.ProviderUserID, &identity.CreatedAt,
 	)
 	if err != nil {
 		return nil, err

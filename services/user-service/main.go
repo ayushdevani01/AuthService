@@ -32,7 +32,7 @@ func main() {
 	rateLimiter := service.NewLoginRateLimiter(redisClient)
 	emailSvc := service.NewEmailService(cfg.ResendAPIKey, cfg.PlatformURL, cfg.EmailFrom)
 	userSvc := service.NewUserService(userRepo, identityRepo, rateLimiter)
-	oauthSvc := service.NewOAuthService(redisClient, db, userSvc, cfg.EncryptionKey, "http://localhost:8080")
+	oauthSvc := service.NewOAuthService(redisClient, db, userSvc, cfg.EncryptionKey, cfg.APIPublicURL)
 	sessionSvc := service.NewSessionService(sessionRepo)
 	resetSvc := service.NewPasswordResetService(resetRepo, identityRepo, userRepo, emailSvc, redisClient)
 	emailVerifSvc := service.NewEmailVerificationService(userRepo, emailSvc, redisClient)

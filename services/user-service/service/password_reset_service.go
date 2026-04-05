@@ -74,18 +74,28 @@ func (s *PasswordResetService) InitiateReset(ctx context.Context, appID, email s
 	if name == "" {
 		name = email
 	}
-	return s.emailSvc.SendPasswordReset(ctx, email, name, rawToken)
+	return s.emailSvc.SendPasswordReset(ctx, appID, email, name, rawToken)
 }
 
 func (s *PasswordResetService) ResetPassword(ctx context.Context, appID, rawToken, newPassword string) error {
 	tokenHash := hashResetToken(rawToken)
 
-	record, err := s.resetRepo.FindByTokenHash(ctx, tokenHash)
-	if err != nil || record == nil {
-		return ErrResetTokenInvalid
+	userID, err := s.resetRepo.ConsumeValidToken(ctx, tokenHash)
+	if err != nil {
+		return err
 	}
-	if record.UsedAt != nil {
-		return ErrResetTokenUsed
+	if userID == "" {
+		record, statusErr := s.resetRepo.FindByTokenHashAny(ctx, tokenHash)
+		if statusErr != nil {
+			return statusErr
+		}
+		if record == nil || time.Now().After(record.ExpiresAt) {
+			return ErrResetTokenInvalid
+		}
+		if record.UsedAt != nil {
+			return ErrResetTokenUsed
+		}
+		return ErrResetTokenInvalid
 	}
 
 	hash, err := hashPassword(newPassword)
@@ -93,11 +103,9 @@ func (s *PasswordResetService) ResetPassword(ctx context.Context, appID, rawToke
 		return err
 	}
 
-	if err := s.identityRepo.UpdatePasswordHash(ctx, record.UserID, hash); err != nil {
+	if err := s.identityRepo.UpdatePasswordHash(ctx, userID, hash); err != nil {
 		return err
 	}
-
-	s.resetRepo.MarkUsed(ctx, record.ID)
 
 	// Remove from Redis so any cached entry is immediately invalidated
 	redisKey := fmt.Sprintf("reset:%s", tokenHash)

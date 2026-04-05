@@ -3,6 +3,8 @@ package handler
 import (
 	"context"
 	"errors"
+	"log"
+	"time"
 
 	pb "github.com/ayushdevan01/AuthService/proto/user"
 	"github.com/ayushdevan01/AuthService/services/user-service/repository"
@@ -45,7 +47,7 @@ func NewUserHandler(
 func (h *UserHandler) CreateUser(ctx context.Context, req *pb.CreateUserRequest) (*pb.CreateUserResponse, error) {
 	user, err := h.userService.CreateUser(
 		ctx, req.AppId, req.Email,
-		derefStr(req.Name), derefStr(req.AvatarUrl),
+		req.Name, req.AvatarUrl,
 		req.Provider, req.ProviderUserId, req.PasswordHash,
 		req.EmailVerified,
 	)
@@ -91,7 +93,7 @@ func (h *UserHandler) GetUserByProviderID(ctx context.Context, req *pb.GetUserBy
 func (h *UserHandler) UpdateUser(ctx context.Context, req *pb.UpdateUserRequest) (*pb.UpdateUserResponse, error) {
 	user, err := h.userService.UpdateUser(
 		ctx, req.UserId, req.AppId,
-		req.Email, req.Name, req.AvatarUrl, req.EmailVerified,
+		req.Email, req.PasswordHash, req.Name, req.AvatarUrl, req.EmailVerified,
 	)
 	if err != nil {
 		if errors.Is(err, service.ErrUserNotFound) {
@@ -136,7 +138,7 @@ func (h *UserHandler) ListUsers(ctx context.Context, req *pb.ListUsersRequest) (
 // --- OAuth ---
 
 func (h *UserHandler) InitiateOAuth(ctx context.Context, req *pb.InitiateOAuthRequest) (*pb.InitiateOAuthResponse, error) {
-	authURL, state, err := h.oauthService.InitiateOAuth(ctx, req.AppId, req.Provider, req.RedirectUri)
+	authURL, state, err := h.oauthService.InitiateOAuth(ctx, req.AppId, req.Provider, req.RedirectUri, req.CodeChallenge, req.CodeChallengeMethod, req.CodeVerifier)
 	if err != nil {
 		if errors.Is(err, service.ErrProviderNotConf) {
 			return nil, status.Errorf(codes.NotFound, "OAuth provider not configured: %s", req.Provider)
@@ -154,6 +156,9 @@ func (h *UserHandler) HandleOAuthCallback(ctx context.Context, req *pb.HandleOAu
 	if err != nil {
 		if errors.Is(err, service.ErrInvalidState) {
 			return nil, status.Errorf(codes.InvalidArgument, "invalid or expired OAuth state")
+		}
+		if errors.Is(err, service.ErrInvalidVerifier) {
+			return nil, status.Errorf(codes.InvalidArgument, "invalid PKCE code verifier")
 		}
 		return nil, status.Errorf(codes.Internal, "OAuth callback failed: %v", err)
 	}
@@ -177,7 +182,13 @@ func (h *UserHandler) RegisterWithEmail(ctx context.Context, req *pb.RegisterWit
 	}
 
 	// Send verification email (non-blocking, uses secure random token)
-	go h.emailVerifService.SendVerification(ctx, req.AppId, user.ID, user.Email, user.Name)
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		if err := h.emailVerifService.SendVerification(ctx, req.AppId, user.ID, user.Email, user.Name); err != nil {
+			log.Printf("Failed to send verification email to %s: %v", user.Email, err)
+		}
+	}()
 
 	return &pb.RegisterWithEmailResponse{
 		User:             toProtoUser(user),
@@ -186,13 +197,19 @@ func (h *UserHandler) RegisterWithEmail(ctx context.Context, req *pb.RegisterWit
 }
 
 func (h *UserHandler) LoginWithEmail(ctx context.Context, req *pb.LoginWithEmailRequest) (*pb.LoginWithEmailResponse, error) {
-	user, err := h.userService.LoginWithEmail(ctx, req.AppId, req.Email, req.Password)
+	user, err := h.userService.LoginWithEmail(ctx, req.AppId, req.Email, req.Password, req.RequireEmailVerification)
 	if err != nil {
 		switch {
 		case errors.Is(err, service.ErrAccountBlocked):
 			return &pb.LoginWithEmailResponse{
 				Success:      false,
-				ErrorMessage: "account temporarily blocked — too many failed attempts",
+				ErrorMessage: "account temporarily blocked - too many failed attempts",
+			}, nil
+		case errors.Is(err, service.ErrEmailNotVerified):
+			return &pb.LoginWithEmailResponse{
+				Success:              false,
+				ErrorMessage:         "email not verified",
+				RequiresVerification: true,
 			}, nil
 		case errors.Is(err, service.ErrInvalidPassword):
 			return &pb.LoginWithEmailResponse{
@@ -211,7 +228,14 @@ func (h *UserHandler) LoginWithEmail(ctx context.Context, req *pb.LoginWithEmail
 
 func (h *UserHandler) ForgotPassword(ctx context.Context, req *pb.ForgotPasswordRequest) (*pb.ForgotPasswordResponse, error) {
 	// Always returns success to avoid leaking whether the email exists
-	h.passwordResetService.InitiateReset(ctx, req.AppId, req.Email)
+	go func() {
+		bgCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		err := h.passwordResetService.InitiateReset(bgCtx, req.AppId, req.Email)
+		if err != nil {
+			log.Printf("ForgotPassword failed for email %s: %v", req.Email, err)
+		}
+	}()
 	return &pb.ForgotPasswordResponse{EmailSent: true}, nil
 }
 
@@ -257,7 +281,7 @@ func (h *UserHandler) CreateSession(ctx context.Context, req *pb.CreateSessionRe
 func (h *UserHandler) GetSession(ctx context.Context, req *pb.GetSessionRequest) (*pb.GetSessionResponse, error) {
 	session, found, expired, err := h.sessionService.GetSession(ctx, req.RefreshTokenHash)
 	if err != nil {
-		return &pb.GetSessionResponse{Found: false}, nil
+		return nil, status.Errorf(codes.Internal, "failed to get session: %v", err)
 	}
 	if !found {
 		return &pb.GetSessionResponse{Found: false}, nil
@@ -270,7 +294,7 @@ func (h *UserHandler) GetSession(ctx context.Context, req *pb.GetSessionRequest)
 }
 
 func (h *UserHandler) RevokeSession(ctx context.Context, req *pb.RevokeSessionRequest) (*pb.RevokeSessionResponse, error) {
-	err := h.sessionService.RevokeSession(ctx, req.SessionId, req.UserId)
+	err := h.sessionService.RevokeSession(ctx, req.UserId, req.SessionId)
 	if err != nil {
 		return &pb.RevokeSessionResponse{Success: false}, nil
 	}
@@ -302,7 +326,7 @@ func (h *UserHandler) ListSessions(ctx context.Context, req *pb.ListSessionsRequ
 // Activity Logging
 
 func (h *UserHandler) LogActivity(ctx context.Context, req *pb.LogActivityRequest) (*pb.LogActivityResponse, error) {
-	return &pb.LogActivityResponse{Queued: true}, nil
+	return nil, status.Error(codes.Unimplemented, "activity logging is not implemented")
 }
 
 // --- Helpers ---
@@ -317,6 +341,8 @@ func toProtoUser(u *repository.User) *pb.User {
 		Email:         u.Email,
 		Name:          u.Name,
 		AvatarUrl:     u.AvatarURL,
+		Provider:      u.Provider,
+		ProviderUserId: u.ProviderUserID,
 		EmailVerified: u.EmailVerified,
 		CreatedAt:     timestamppb.New(u.CreatedAt),
 	}
@@ -341,9 +367,3 @@ func toProtoSession(s *repository.Session) *pb.Session {
 	}
 }
 
-func derefStr(s *string) string {
-	if s == nil {
-		return ""
-	}
-	return *s
-}

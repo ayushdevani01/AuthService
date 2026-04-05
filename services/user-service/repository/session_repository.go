@@ -122,7 +122,7 @@ func (r *SessionRepository) FindByRefreshTokenHash(ctx context.Context, hash str
 	return session, nil
 }
 
-func (r *SessionRepository) Revoke(ctx context.Context, sessionID, userID string) error {
+func (r *SessionRepository) Revoke(ctx context.Context, userID, sessionID string) error {
 	// Get the session to find the refresh token hash for Redis cleanup
 	var refreshTokenHash string
 	err := r.db.QueryRow(ctx, `
@@ -169,7 +169,14 @@ func (r *SessionRepository) RevokeAll(ctx context.Context, userID, appID, except
 		selectArgs = append(selectArgs, exceptSessionID)
 	}
 
-	rows, err := r.db.Query(ctx, selectQuery, selectArgs...)
+	// Begin transaction to prevent race conditions during revocation
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return 0, err
+	}
+	defer tx.Rollback(ctx)
+
+	rows, err := tx.Query(ctx, selectQuery, selectArgs...)
 	if err != nil {
 		return 0, err
 	}
@@ -184,12 +191,16 @@ func (r *SessionRepository) RevokeAll(ctx context.Context, userID, appID, except
 		hashes = append(hashes, hash)
 	}
 
-	// Revoke in Postgres
-	tag, err := r.db.Exec(ctx, query, args...)
+	// Revoke in Postgres within the transaction
+	tag, err := tx.Exec(ctx, query, args...)
 	if err != nil {
 		return 0, err
 	}
 	result = int(tag.RowsAffected())
+
+	if err := tx.Commit(ctx); err != nil {
+		return 0, err
+	}
 
 	// Remove all from Redis
 	for _, hash := range hashes {
@@ -227,20 +238,25 @@ func (r *SessionRepository) ListByUser(ctx context.Context, userID, appID string
 
 func (r *SessionRepository) UpdateRefreshToken(ctx context.Context, sessionID, newHash string, newExpiresAt time.Time) (string, error) {
 	var oldHash string
+	var userID, appID string
 	err := r.db.QueryRow(ctx, `
+		SELECT refresh_token_hash, user_id, app_id FROM sessions
+		WHERE id = $1 AND revoked_at IS NULL
+	`, sessionID).Scan(&oldHash, &userID, &appID)
+	if err != nil {
+		return "", err
+	}
+
+	_, err = r.db.Exec(ctx, `
 		UPDATE sessions SET refresh_token_hash = $2, expires_at = $3
 		WHERE id = $1 AND revoked_at IS NULL
-		RETURNING (SELECT refresh_token_hash FROM sessions WHERE id = $1)
-	`, sessionID, newHash, newExpiresAt).Scan(&oldHash)
+	`, sessionID, newHash, newExpiresAt)
 	if err != nil {
 		return "", err
 	}
 
 	// Remove old Redis key, set new one
 	r.redis.Del(ctx, fmt.Sprintf("session:%s", oldHash))
-
-	var userID, appID string
-	r.db.QueryRow(ctx, `SELECT user_id, app_id FROM sessions WHERE id = $1`, sessionID).Scan(&userID, &appID)
 
 	cacheData, _ := json.Marshal(sessionCache{
 		UserID:    userID,
