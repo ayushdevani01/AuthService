@@ -33,8 +33,10 @@ func (h *TokenHandler) GenerateTokenPair(ctx context.Context, req *pb.GenerateTo
 	}
 
 	return &pb.GenerateTokenPairResponse{
-		AccessToken:          result.AccessToken,
-		AccessTokenExpiresAt: result.AccessTokenExpiresAt,
+		AccessToken:           result.AccessToken,
+		RefreshToken:          result.RefreshToken,
+		AccessTokenExpiresAt:  result.AccessTokenExpiresAt,
+		RefreshTokenExpiresAt: result.RefreshTokenExpiresAt,
 	}, nil
 }
 
