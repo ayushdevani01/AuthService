@@ -1,3 +1,7 @@
 *.md
 .env
-frontend/
+node_modules/
+.next/
+out/
+dist/
+.env.local
