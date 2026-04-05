@@ -1,12 +1,14 @@
 package routes
 
 import (
+	"io"
 	"net/http"
 	"strconv"
 
 	pb "github.com/ayushdevan01/AuthService/proto/developer"
 	pbUser "github.com/ayushdevan01/AuthService/proto/user"
 	"github.com/gin-gonic/gin"
+	"google.golang.org/grpc/metadata"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
@@ -111,7 +113,8 @@ func (dr *DeveloperRoutes) UpdateProfile(c *gin.Context) {
 	developerID := c.GetString("developer_id")
 
 	var req struct {
-		Name *string `json:"name"`
+		Name     *string `json:"name"`
+		Password *string `json:"password"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -121,6 +124,9 @@ func (dr *DeveloperRoutes) UpdateProfile(c *gin.Context) {
 	grpcReq := &pb.UpdateProfileRequest{DeveloperId: developerID}
 	if req.Name != nil {
 		grpcReq.Name = req.Name
+	}
+	if req.Password != nil {
+		grpcReq.Password = req.Password
 	}
 
 	resp, err := dr.client.UpdateProfile(c.Request.Context(), grpcReq)
@@ -141,6 +147,7 @@ func (dr *DeveloperRoutes) CreateApp(c *gin.Context) {
 		Name         string   `json:"name" binding:"required"`
 		LogoURL      string   `json:"logo_url"`
 		RedirectURLs []string `json:"redirect_urls"`
+		RequireEmailVerification bool `json:"require_email_verification"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -152,6 +159,7 @@ func (dr *DeveloperRoutes) CreateApp(c *gin.Context) {
 		Name:         req.Name,
 		LogoUrl:      req.LogoURL,
 		RedirectUrls: req.RedirectURLs,
+		RequireEmailVerification: req.RequireEmailVerification,
 	})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -185,9 +193,11 @@ func (dr *DeveloperRoutes) ListApps(c *gin.Context) {
 }
 
 func (dr *DeveloperRoutes) GetApp(c *gin.Context) {
+	developerID := c.GetString("developer_id")
 	appID := c.Param("id")
+	ctx := metadata.AppendToOutgoingContext(c.Request.Context(), "developer-id", developerID)
 
-	resp, err := dr.client.GetApp(c.Request.Context(), &pb.GetAppRequest{
+	resp, err := dr.client.GetApp(ctx, &pb.GetAppRequest{
 		AppId: appID,
 	})
 	if err != nil {
@@ -196,6 +206,10 @@ func (dr *DeveloperRoutes) GetApp(c *gin.Context) {
 	}
 
 	if !resp.Found {
+		c.JSON(http.StatusNotFound, gin.H{"error": "app not found"})
+		return
+	}
+	if resp.App.DeveloperId != developerID {
 		c.JSON(http.StatusNotFound, gin.H{"error": "app not found"})
 		return
 	}
@@ -211,6 +225,7 @@ func (dr *DeveloperRoutes) UpdateApp(c *gin.Context) {
 		Name         *string  `json:"name"`
 		LogoURL      *string  `json:"logo_url"`
 		RedirectURLs []string `json:"redirect_urls"`
+		RequireEmailVerification *bool `json:"require_email_verification"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -227,6 +242,9 @@ func (dr *DeveloperRoutes) UpdateApp(c *gin.Context) {
 	}
 	if req.LogoURL != nil {
 		grpcReq.LogoUrl = req.LogoURL
+	}
+	if req.RequireEmailVerification != nil {
+		grpcReq.RequireEmailVerification = req.RequireEmailVerification
 	}
 
 	resp, err := dr.client.UpdateApp(c.Request.Context(), grpcReq)
@@ -279,7 +297,16 @@ func (dr *DeveloperRoutes) RotateSigningKeys(c *gin.Context) {
 	var req struct {
 		GracePeriodHours int32 `json:"grace_period_hours"`
 	}
-	c.ShouldBindJSON(&req)
+	req.GracePeriodHours = 24
+	if err := c.ShouldBindJSON(&req); err != nil {
+		if err != io.EOF {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+	}
+	if req.GracePeriodHours <= 0 {
+		req.GracePeriodHours = 24
+	}
 
 	resp, err := dr.client.RotateSigningKeys(c.Request.Context(), &pb.RotateSigningKeysRequest{
 		AppId:            appID,
@@ -328,6 +355,17 @@ func (dr *DeveloperRoutes) ListSigningKeys(c *gin.Context) {
 func (dr *DeveloperRoutes) AddOAuthProvider(c *gin.Context) {
 	developerID := c.GetString("developer_id")
 	appID := c.Param("id")
+	ctx := metadata.AppendToOutgoingContext(c.Request.Context(), "developer-id", developerID)
+
+	appResp, err := dr.client.GetApp(ctx, &pb.GetAppRequest{AppId: appID})
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	if !appResp.Found || appResp.App.DeveloperId != developerID {
+		c.JSON(http.StatusNotFound, gin.H{"error": "app not found"})
+		return
+	}
 
 	var req struct {
 		Provider     string   `json:"provider" binding:"required"`
@@ -341,7 +379,7 @@ func (dr *DeveloperRoutes) AddOAuthProvider(c *gin.Context) {
 	}
 
 	resp, err := dr.client.AddOAuthProvider(c.Request.Context(), &pb.AddOAuthProviderRequest{
-		AppId:        appID,
+		AppId:        appResp.App.Id,
 		DeveloperId:  developerID,
 		Provider:     req.Provider,
 		ClientId:     req.ClientID,
@@ -359,9 +397,20 @@ func (dr *DeveloperRoutes) AddOAuthProvider(c *gin.Context) {
 func (dr *DeveloperRoutes) ListOAuthProviders(c *gin.Context) {
 	developerID := c.GetString("developer_id")
 	appID := c.Param("id")
+	ctx := metadata.AppendToOutgoingContext(c.Request.Context(), "developer-id", developerID)
+
+	appResp, err := dr.client.GetApp(ctx, &pb.GetAppRequest{AppId: appID})
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	if !appResp.Found || appResp.App.DeveloperId != developerID {
+		c.JSON(http.StatusNotFound, gin.H{"error": "app not found"})
+		return
+	}
 
 	resp, err := dr.client.ListOAuthProviders(c.Request.Context(), &pb.ListOAuthProvidersRequest{
-		AppId:       appID,
+		AppId:       appResp.App.Id,
 		DeveloperId: developerID,
 	})
 	if err != nil {
@@ -381,6 +430,17 @@ func (dr *DeveloperRoutes) UpdateOAuthProvider(c *gin.Context) {
 	developerID := c.GetString("developer_id")
 	appID := c.Param("id")
 	provider := c.Param("provider")
+	ctx := metadata.AppendToOutgoingContext(c.Request.Context(), "developer-id", developerID)
+
+	appResp, err := dr.client.GetApp(ctx, &pb.GetAppRequest{AppId: appID})
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	if !appResp.Found || appResp.App.DeveloperId != developerID {
+		c.JSON(http.StatusNotFound, gin.H{"error": "app not found"})
+		return
+	}
 
 	var req struct {
 		ClientID     *string  `json:"client_id"`
@@ -394,7 +454,7 @@ func (dr *DeveloperRoutes) UpdateOAuthProvider(c *gin.Context) {
 	}
 
 	resp, err := dr.client.UpdateOAuthProvider(c.Request.Context(), &pb.UpdateOAuthProviderRequest{
-		AppId:        appID,
+		AppId:        appResp.App.Id,
 		DeveloperId:  developerID,
 		Provider:     provider,
 		ClientId:     req.ClientID,
@@ -414,9 +474,20 @@ func (dr *DeveloperRoutes) DeleteOAuthProvider(c *gin.Context) {
 	developerID := c.GetString("developer_id")
 	appID := c.Param("id")
 	provider := c.Param("provider")
+	ctx := metadata.AppendToOutgoingContext(c.Request.Context(), "developer-id", developerID)
 
-	_, err := dr.client.DeleteOAuthProvider(c.Request.Context(), &pb.DeleteOAuthProviderRequest{
-		AppId:       appID,
+	appResp, err := dr.client.GetApp(ctx, &pb.GetAppRequest{AppId: appID})
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	if !appResp.Found || appResp.App.DeveloperId != developerID {
+		c.JSON(http.StatusNotFound, gin.H{"error": "app not found"})
+		return
+	}
+
+	_, err = dr.client.DeleteOAuthProvider(c.Request.Context(), &pb.DeleteOAuthProviderRequest{
+		AppId:       appResp.App.Id,
 		DeveloperId: developerID,
 		Provider:    provider,
 	})
@@ -439,6 +510,7 @@ func formatDeveloper(d *pb.Developer) gin.H {
 		"email":      d.Email,
 		"name":       d.Name,
 		"created_at": formatTimestamp(d.CreatedAt),
+		"updated_at": formatTimestamp(d.UpdatedAt),
 	}
 }
 
@@ -453,6 +525,7 @@ func formatApp(a *pb.App) gin.H {
 		"name":          a.Name,
 		"logo_url":      a.LogoUrl,
 		"redirect_urls": a.RedirectUrls,
+		"require_email_verification": a.RequireEmailVerification,
 		"created_at":    formatTimestamp(a.CreatedAt),
 		"updated_at":    formatTimestamp(a.UpdatedAt),
 	}
@@ -502,11 +575,41 @@ func formatTimestamp(ts *timestamppb.Timestamp) *string {
 	return &s
 }
 
+func formatUser(u *pbUser.User) gin.H {
+	if u == nil {
+		return nil
+	}
+	return gin.H{
+		"id":               u.Id,
+		"app_id":           u.AppId,
+		"email":            u.Email,
+		"name":             u.Name,
+		"avatar_url":       u.AvatarUrl,
+		"provider":         u.Provider,
+		"provider_user_id": u.ProviderUserId,
+		"email_verified":   u.EmailVerified,
+		"created_at":       formatTimestamp(u.CreatedAt),
+		"last_login_at":    formatTimestamp(u.LastLoginAt),
+	}
+}
+
 // GET /api/v1/apps/:id/users
 func (dr *DeveloperRoutes) ListUsers(c *gin.Context) {
+	developerID := c.GetString("developer_id")
 	appID := c.Param("id")
 	if appID == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "app ID required"})
+		return
+	}
+
+	ctx := metadata.AppendToOutgoingContext(c.Request.Context(), "developer-id", developerID)
+	appResp, err := dr.client.GetApp(ctx, &pb.GetAppRequest{AppId: appID})
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	if !appResp.Found || appResp.App.DeveloperId != developerID {
+		c.JSON(http.StatusNotFound, gin.H{"error": "app not found"})
 		return
 	}
 
@@ -523,7 +626,7 @@ func (dr *DeveloperRoutes) ListUsers(c *gin.Context) {
 	}
 
 	resp, err := dr.userClient.ListUsers(c.Request.Context(), &pbUser.ListUsersRequest{
-		AppId:          appID,
+		AppId:          appResp.App.Id,
 		PageSize:       pageSize,
 		PageToken:      pageToken,
 		ProviderFilter: providerFilter,
@@ -534,5 +637,14 @@ func (dr *DeveloperRoutes) ListUsers(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, resp)
+	users := make([]gin.H, 0, len(resp.Users))
+	for _, u := range resp.Users {
+		users = append(users, formatUser(u))
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"users":           users,
+		"next_page_token": resp.NextPageToken,
+		"total_count":     resp.TotalCount,
+	})
 }
