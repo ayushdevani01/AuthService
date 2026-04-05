@@ -355,17 +355,6 @@ func (dr *DeveloperRoutes) ListSigningKeys(c *gin.Context) {
 func (dr *DeveloperRoutes) AddOAuthProvider(c *gin.Context) {
 	developerID := c.GetString("developer_id")
 	appID := c.Param("id")
-	ctx := metadata.AppendToOutgoingContext(c.Request.Context(), "developer-id", developerID)
-
-	appResp, err := dr.client.GetApp(ctx, &pb.GetAppRequest{AppId: appID})
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-	if !appResp.Found || appResp.App.DeveloperId != developerID {
-		c.JSON(http.StatusNotFound, gin.H{"error": "app not found"})
-		return
-	}
 
 	var req struct {
 		Provider     string   `json:"provider" binding:"required"`
@@ -379,7 +368,7 @@ func (dr *DeveloperRoutes) AddOAuthProvider(c *gin.Context) {
 	}
 
 	resp, err := dr.client.AddOAuthProvider(c.Request.Context(), &pb.AddOAuthProviderRequest{
-		AppId:        appResp.App.Id,
+		AppId:        appID,
 		DeveloperId:  developerID,
 		Provider:     req.Provider,
 		ClientId:     req.ClientID,
@@ -397,20 +386,9 @@ func (dr *DeveloperRoutes) AddOAuthProvider(c *gin.Context) {
 func (dr *DeveloperRoutes) ListOAuthProviders(c *gin.Context) {
 	developerID := c.GetString("developer_id")
 	appID := c.Param("id")
-	ctx := metadata.AppendToOutgoingContext(c.Request.Context(), "developer-id", developerID)
-
-	appResp, err := dr.client.GetApp(ctx, &pb.GetAppRequest{AppId: appID})
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-	if !appResp.Found || appResp.App.DeveloperId != developerID {
-		c.JSON(http.StatusNotFound, gin.H{"error": "app not found"})
-		return
-	}
 
 	resp, err := dr.client.ListOAuthProviders(c.Request.Context(), &pb.ListOAuthProvidersRequest{
-		AppId:       appResp.App.Id,
+		AppId:       appID,
 		DeveloperId: developerID,
 	})
 	if err != nil {
@@ -430,18 +408,6 @@ func (dr *DeveloperRoutes) UpdateOAuthProvider(c *gin.Context) {
 	developerID := c.GetString("developer_id")
 	appID := c.Param("id")
 	provider := c.Param("provider")
-	ctx := metadata.AppendToOutgoingContext(c.Request.Context(), "developer-id", developerID)
-
-	appResp, err := dr.client.GetApp(ctx, &pb.GetAppRequest{AppId: appID})
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-	if !appResp.Found || appResp.App.DeveloperId != developerID {
-		c.JSON(http.StatusNotFound, gin.H{"error": "app not found"})
-		return
-	}
-
 	var req struct {
 		ClientID     *string  `json:"client_id"`
 		ClientSecret *string  `json:"client_secret"`
@@ -454,7 +420,7 @@ func (dr *DeveloperRoutes) UpdateOAuthProvider(c *gin.Context) {
 	}
 
 	resp, err := dr.client.UpdateOAuthProvider(c.Request.Context(), &pb.UpdateOAuthProviderRequest{
-		AppId:        appResp.App.Id,
+		AppId:        appID,
 		DeveloperId:  developerID,
 		Provider:     provider,
 		ClientId:     req.ClientID,
@@ -474,20 +440,8 @@ func (dr *DeveloperRoutes) DeleteOAuthProvider(c *gin.Context) {
 	developerID := c.GetString("developer_id")
 	appID := c.Param("id")
 	provider := c.Param("provider")
-	ctx := metadata.AppendToOutgoingContext(c.Request.Context(), "developer-id", developerID)
-
-	appResp, err := dr.client.GetApp(ctx, &pb.GetAppRequest{AppId: appID})
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-	if !appResp.Found || appResp.App.DeveloperId != developerID {
-		c.JSON(http.StatusNotFound, gin.H{"error": "app not found"})
-		return
-	}
-
-	_, err = dr.client.DeleteOAuthProvider(c.Request.Context(), &pb.DeleteOAuthProviderRequest{
-		AppId:       appResp.App.Id,
+	_, err := dr.client.DeleteOAuthProvider(c.Request.Context(), &pb.DeleteOAuthProviderRequest{
+		AppId:       appID,
 		DeveloperId: developerID,
 		Provider:    provider,
 	})
