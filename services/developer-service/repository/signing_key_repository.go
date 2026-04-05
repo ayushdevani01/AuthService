@@ -59,7 +59,7 @@ func generateRSAKeyPair() (string, string, error) {
 }
 
 func generateKID() string {
-	return fmt.Sprintf("key-%s", time.Now().Format("2006-01-02"))
+	return fmt.Sprintf("key-%d", time.Now().UnixNano())
 }
 
 func (r *SigningKeyRepository) Create(ctx context.Context, appID string) (*SigningKey, error) {
@@ -93,7 +93,8 @@ func (r *SigningKeyRepository) GetActiveByAppID(ctx context.Context, appID strin
 	key := &SigningKey{}
 	err := r.db.QueryRow(ctx, `
 		SELECT id, app_id, kid, public_key, private_key_encrypted, is_active, created_at, expires_at, rotated_at
-		FROM signing_keys WHERE app_id = $1 AND is_active = true
+		FROM signing_keys
+		WHERE app_id = $1 AND is_active = true
 	`, appID).Scan(
 		&key.ID, &key.AppID, &key.KID, &key.PublicKey, &key.PrivateKeyEncrypted, &key.IsActive, &key.CreatedAt, &key.ExpiresAt, &key.RotatedAt,
 	)
@@ -113,11 +114,11 @@ func (r *SigningKeyRepository) GetDecryptedPrivateKey(ctx context.Context, appID
 
 func (r *SigningKeyRepository) ListByAppID(ctx context.Context, appID string, includeExpired bool) ([]*SigningKey, error) {
 	query := `
-		SELECT id, app_id, kid, public_key, private_key_encrypted, is_active, created_at, expires_at, rotated_at
+		SELECT id, app_id, kid, public_key, is_active, created_at, expires_at, rotated_at
 		FROM signing_keys WHERE app_id = $1
 	`
 	if !includeExpired {
-		query += ` AND expires_at > NOW()`
+		query += ` AND (expires_at IS NULL OR expires_at > NOW())`
 	}
 	query += ` ORDER BY created_at DESC`
 
@@ -130,7 +131,7 @@ func (r *SigningKeyRepository) ListByAppID(ctx context.Context, appID string, in
 	var keys []*SigningKey
 	for rows.Next() {
 		key := &SigningKey{}
-		err := rows.Scan(&key.ID, &key.AppID, &key.KID, &key.PublicKey, &key.PrivateKeyEncrypted, &key.IsActive, &key.CreatedAt, &key.ExpiresAt, &key.RotatedAt)
+		err := rows.Scan(&key.ID, &key.AppID, &key.KID, &key.PublicKey, &key.IsActive, &key.CreatedAt, &key.ExpiresAt, &key.RotatedAt)
 		if err != nil {
 			return nil, err
 		}
@@ -140,28 +141,34 @@ func (r *SigningKeyRepository) ListByAppID(ctx context.Context, appID string, in
 }
 
 func (r *SigningKeyRepository) Rotate(ctx context.Context, appID string, gracePeriodHours int) (*SigningKey, *SigningKey, error) {
+	// Create new key first
+	newKey, err := r.Create(ctx, appID)
+	if err != nil {
+		return nil, nil, err
+	}
+
 	now := time.Now()
 	expiresAt := now.Add(time.Duration(gracePeriodHours) * time.Hour)
 
-	_, err := r.db.Exec(ctx, `
+	_, err = r.db.Exec(ctx, `
 		UPDATE signing_keys SET is_active = false, rotated_at = $2, expires_at = $3
-		WHERE app_id = $1 AND is_active = true
-	`, appID, now, expiresAt)
+		WHERE app_id = $1 AND is_active = true AND id != $4
+	`, appID, now, expiresAt, newKey.ID)
 	if err != nil {
 		return nil, nil, err
 	}
 
 	oldKey := &SigningKey{}
-	r.db.QueryRow(ctx, `
+	err = r.db.QueryRow(ctx, `
 		SELECT id, app_id, kid, public_key, private_key_encrypted, is_active, created_at, expires_at, rotated_at
-		FROM signing_keys WHERE app_id = $1 AND rotated_at = $2
-	`, appID, now).Scan(
+		FROM signing_keys WHERE app_id = $1 AND id != $2 AND rotated_at IS NOT NULL
+		ORDER BY rotated_at DESC
+		LIMIT 1
+	`, appID, newKey.ID).Scan(
 		&oldKey.ID, &oldKey.AppID, &oldKey.KID, &oldKey.PublicKey, &oldKey.PrivateKeyEncrypted, &oldKey.IsActive, &oldKey.CreatedAt, &oldKey.ExpiresAt, &oldKey.RotatedAt,
 	)
-
-	newKey, err := r.Create(ctx, appID)
 	if err != nil {
-		return nil, nil, err
+		oldKey = nil
 	}
 
 	return newKey, oldKey, nil
