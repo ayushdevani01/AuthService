@@ -11,6 +11,7 @@ func GenerateToken(developerID, email, secret string) (string, error) {
 	claims := jwt.MapClaims{
 		"developer_id": developerID,
 		"email":        email,
+		"token_type":   "access",
 		"exp":          time.Now().Add(24 * time.Hour).Unix(),
 	}
 

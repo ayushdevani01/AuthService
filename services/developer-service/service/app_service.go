@@ -37,8 +37,8 @@ type CreateAppResponse struct {
 	SigningKey *repository.SigningKey
 }
 
-func (s *AppService) CreateApp(ctx context.Context, developerID, name, logoURL string, redirectURLs []string) (*CreateAppResponse, error) {
-	app, apiKey, err := s.appRepo.Create(ctx, developerID, name, logoURL, redirectURLs)
+func (s *AppService) CreateApp(ctx context.Context, developerID, name, logoURL string, redirectURLs []string, requireEmailVerification bool) (*CreateAppResponse, error) {
+	app, apiKey, err := s.appRepo.Create(ctx, developerID, name, logoURL, redirectURLs, requireEmailVerification)
 	if err != nil {
 		return nil, err
 	}
@@ -70,7 +70,7 @@ func (s *AppService) ListApps(ctx context.Context, developerID string) ([]*repos
 	return s.appRepo.ListByDeveloper(ctx, developerID)
 }
 
-func (s *AppService) UpdateApp(ctx context.Context, appID, developerID string, name, logoURL *string, redirectURLs []string) (*repository.App, error) {
+func (s *AppService) UpdateApp(ctx context.Context, appID, developerID string, name, logoURL *string, redirectURLs []string, requireEmailVerification *bool) (*repository.App, error) {
 	app, err := s.appRepo.FindByID(ctx, appID)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -83,7 +83,20 @@ func (s *AppService) UpdateApp(ctx context.Context, appID, developerID string, n
 		return nil, ErrNotAppOwner
 	}
 
-	return s.appRepo.Update(ctx, appID, name, logoURL, redirectURLs)
+	if name != nil {
+		app.Name = *name
+	}
+	if logoURL != nil {
+		app.LogoURL = *logoURL
+	}
+	if redirectURLs != nil {
+		app.RedirectURLs = redirectURLs
+	}
+	if requireEmailVerification != nil {
+		app.RequireEmailVerification = *requireEmailVerification
+	}
+
+	return s.appRepo.Update(ctx, app)
 }
 
 func (s *AppService) DeleteApp(ctx context.Context, appID, developerID string) error {
@@ -99,7 +112,7 @@ func (s *AppService) DeleteApp(ctx context.Context, appID, developerID string) e
 		return ErrNotAppOwner
 	}
 
-	return s.appRepo.Delete(ctx, appID)
+	return s.appRepo.Delete(ctx, app.ID)
 }
 
 func (s *AppService) RotateAPIKey(ctx context.Context, appID, developerID string) (string, error) {
@@ -115,7 +128,7 @@ func (s *AppService) RotateAPIKey(ctx context.Context, appID, developerID string
 		return "", ErrNotAppOwner
 	}
 
-	return s.appRepo.RotateAPIKey(ctx, appID)
+	return s.appRepo.RotateAPIKey(ctx, app.ID)
 }
 
 func (s *AppService) RotateSigningKeys(ctx context.Context, appID, developerID string, gracePeriodHours int) (*repository.SigningKey, *repository.SigningKey, error) {
@@ -135,7 +148,7 @@ func (s *AppService) RotateSigningKeys(ctx context.Context, appID, developerID s
 		gracePeriodHours = 24
 	}
 
-	return s.signingKeyRepo.Rotate(ctx, appID, gracePeriodHours)
+	return s.signingKeyRepo.Rotate(ctx, app.ID, gracePeriodHours)
 }
 
 func (s *AppService) ListSigningKeys(ctx context.Context, appID, developerID string, includeExpired bool) ([]*repository.SigningKey, error) {
@@ -151,7 +164,7 @@ func (s *AppService) ListSigningKeys(ctx context.Context, appID, developerID str
 		return nil, ErrNotAppOwner
 	}
 
-	return s.signingKeyRepo.ListByAppID(ctx, appID, includeExpired)
+	return s.signingKeyRepo.ListByAppID(ctx, app.ID, includeExpired)
 }
 
 type ActiveSigningKeyResponse struct {
@@ -160,7 +173,15 @@ type ActiveSigningKeyResponse struct {
 }
 
 func (s *AppService) GetActiveSigningKey(ctx context.Context, appID string) (*ActiveSigningKeyResponse, error) {
-	key, err := s.signingKeyRepo.GetActiveByAppID(ctx, appID)
+	app, err := s.appRepo.FindByID(ctx, appID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrAppNotFound
+		}
+		return nil, err
+	}
+
+	key, err := s.signingKeyRepo.GetActiveByAppID(ctx, app.ID)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, ErrAppNotFound
@@ -198,7 +219,7 @@ func (s *AppService) AddOAuthProvider(ctx context.Context, appID, developerID, p
 		return nil, err
 	}
 
-	return s.oauthRepo.Create(ctx, appID, provider, clientID, encryptedSecret, scopes)
+	return s.oauthRepo.Create(ctx, app.ID, provider, clientID, encryptedSecret, scopes)
 }
 
 type OAuthProviderResponse struct {
@@ -239,7 +260,7 @@ func (s *AppService) ListOAuthProviders(ctx context.Context, appID, developerID 
 		return nil, ErrNotAppOwner
 	}
 
-	return s.oauthRepo.ListByAppID(ctx, appID)
+	return s.oauthRepo.ListByAppID(ctx, app.ID)
 }
 
 func (s *AppService) UpdateOAuthProvider(ctx context.Context, appID, developerID, provider string, clientID, clientSecret *string, scopes []string, enabled *bool) (*repository.OAuthProvider, error) {
@@ -264,7 +285,7 @@ func (s *AppService) UpdateOAuthProvider(ctx context.Context, appID, developerID
 		encryptedSecret = &encrypted
 	}
 
-	return s.oauthRepo.Update(ctx, appID, provider, clientID, encryptedSecret, scopes, enabled)
+	return s.oauthRepo.Update(ctx, app.ID, provider, clientID, encryptedSecret, scopes, enabled)
 }
 
 func (s *AppService) DeleteOAuthProvider(ctx context.Context, appID, developerID, provider string) error {
@@ -280,5 +301,5 @@ func (s *AppService) DeleteOAuthProvider(ctx context.Context, appID, developerID
 		return ErrNotAppOwner
 	}
 
-	return s.oauthRepo.Delete(ctx, appID, provider)
+	return s.oauthRepo.Delete(ctx, app.ID, provider)
 }

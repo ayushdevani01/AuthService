@@ -50,6 +50,10 @@ func (h *CombinedHandler) GetApp(ctx context.Context, req *pb.GetAppRequest) (*p
 	return h.AppHandler.GetApp(ctx, req)
 }
 
+func (h *CombinedHandler) GetPublicApp(ctx context.Context, req *pb.GetPublicAppRequest) (*pb.GetPublicAppResponse, error) {
+	return h.AppHandler.GetPublicApp(ctx, req)
+}
+
 func (h *CombinedHandler) ListApps(ctx context.Context, req *pb.ListAppsRequest) (*pb.ListAppsResponse, error) {
 	return h.AppHandler.ListApps(ctx, req)
 }
