@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package user;
 
-option go_package = "github.com/ayushdevani/authservice/proto/user";
+option go_package = "github.com/ayushdevan01/AuthService/proto/user";
 
 import "google/protobuf/timestamp.proto";
 
@@ -131,6 +131,7 @@ message InitiateOAuthRequest {
   string redirect_uri = 3;
   string code_challenge = 4; // PKCE
   string code_challenge_method = 5;
+  string code_verifier = 6;
 }
 
 message InitiateOAuthResponse {
@@ -142,7 +143,6 @@ message HandleOAuthCallbackRequest {
   string provider = 1;
   string code = 2;
   string state = 3;
-  string code_verifier = 4;
 }
 
 message HandleOAuthCallbackResponse {
@@ -169,12 +169,14 @@ message LoginWithEmailRequest {
   string app_id = 1;
   string email = 2;
   string password = 3;
+  bool require_email_verification = 4;
 }
 
 message LoginWithEmailResponse {
   User user = 1;
   bool success = 2;
   string error_message = 3;
+  bool requires_verification = 4;
 }
 
 message ForgotPasswordRequest {

@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package token;
 
-option go_package = "github.com/ayushdevani/authservice/proto/token";
+option go_package = "github.com/ayushdevan01/AuthService/proto/token";
 
 // TOKEN SERVICE
 // Handles JWT signing, refresh, revocation, and public keys
