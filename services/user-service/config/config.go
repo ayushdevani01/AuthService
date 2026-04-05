@@ -9,6 +9,7 @@ type Config struct {
 	EncryptionKey string
 	ResendAPIKey  string
 	PlatformURL   string
+	APIPublicURL  string
 	EmailFrom     string
 }
 
@@ -20,6 +21,7 @@ func Load() *Config {
 		EncryptionKey: getEnv("ENCRYPTION_KEY", "dev-encryption-key-32-bytes!!!!"),
 		ResendAPIKey:  getEnv("RESEND_API_KEY", ""),
 		PlatformURL:   getEnv("PLATFORM_URL", "http://localhost:3001"),
+		APIPublicURL:  getEnv("API_PUBLIC_URL", "http://localhost:8080"),
 		EmailFrom:     getEnv("EMAIL_FROM", ""),
 	}
 }

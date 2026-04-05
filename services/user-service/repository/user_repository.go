@@ -2,6 +2,8 @@ package repository
 
 import (
 	"context"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -9,14 +11,16 @@ import (
 )
 
 type User struct {
-	ID            string
-	AppID         string
-	Email         string
-	Name          string
-	AvatarURL     string
-	EmailVerified bool
-	CreatedAt     time.Time
-	LastLoginAt   *time.Time
+	ID             string
+	AppID          string
+	Email          string
+	Name           string
+	AvatarURL      string
+	Provider       string
+	ProviderUserID string
+	EmailVerified  bool
+	CreatedAt      time.Time
+	LastLoginAt    *time.Time
 }
 
 type UserRepository struct {
@@ -27,12 +31,12 @@ func NewUserRepository(db *pgxpool.Pool) *UserRepository {
 	return &UserRepository{db: db}
 }
 
-func (r *UserRepository) Create(ctx context.Context, appID, email, name, avatarURL string, emailVerified bool) (*User, error) {
+func (r *UserRepository) Create(ctx context.Context, appID, email string, name, avatarURL *string, emailVerified bool) (*User, error) {
 	user := &User{}
 	err := r.db.QueryRow(ctx, `
 		INSERT INTO users (app_id, email, name, avatar_url, email_verified)
 		VALUES ($1, $2, $3, $4, $5)
-		RETURNING id, app_id, email, name, avatar_url, email_verified, created_at, last_login_at
+		RETURNING id, app_id, email, COALESCE(name, ''), COALESCE(avatar_url, ''), email_verified, created_at, last_login_at
 	`, appID, email, name, avatarURL, emailVerified).Scan(
 		&user.ID, &user.AppID, &user.Email, &user.Name, &user.AvatarURL,
 		&user.EmailVerified, &user.CreatedAt, &user.LastLoginAt,
@@ -46,8 +50,10 @@ func (r *UserRepository) Create(ctx context.Context, appID, email, name, avatarU
 func (r *UserRepository) FindByID(ctx context.Context, userID, appID string) (*User, error) {
 	user := &User{}
 	err := r.db.QueryRow(ctx, `
-		SELECT id, app_id, email, name, avatar_url, email_verified, created_at, last_login_at
-		FROM users WHERE id = $1 AND app_id = $2
+		SELECT id, app_id, email, COALESCE(name, ''), COALESCE(avatar_url, ''),
+		       email_verified, created_at, last_login_at
+		FROM users
+		WHERE id = $1 AND app_id = $2
 	`, userID, appID).Scan(
 		&user.ID, &user.AppID, &user.Email, &user.Name, &user.AvatarURL,
 		&user.EmailVerified, &user.CreatedAt, &user.LastLoginAt,
@@ -61,8 +67,10 @@ func (r *UserRepository) FindByID(ctx context.Context, userID, appID string) (*U
 func (r *UserRepository) FindByEmail(ctx context.Context, appID, email string) (*User, error) {
 	user := &User{}
 	err := r.db.QueryRow(ctx, `
-		SELECT id, app_id, email, name, avatar_url, email_verified, created_at, last_login_at
-		FROM users WHERE app_id = $1 AND email = $2
+		SELECT id, app_id, email, COALESCE(name, ''), COALESCE(avatar_url, ''),
+		       email_verified, created_at, last_login_at
+		FROM users
+		WHERE app_id = $1 AND email = $2
 	`, appID, email).Scan(
 		&user.ID, &user.AppID, &user.Email, &user.Name, &user.AvatarURL,
 		&user.EmailVerified, &user.CreatedAt, &user.LastLoginAt,
@@ -81,36 +89,18 @@ func (r *UserRepository) UpdateLastLogin(ctx context.Context, userID string) err
 }
 
 func (r *UserRepository) Update(ctx context.Context, userID, appID string, email, name, avatarURL *string, emailVerified *bool) (*User, error) {
-	// Fetch current user first
-	current, err := r.FindByID(ctx, userID, appID)
-	if err != nil {
-		return nil, err
-	}
-
-	// Apply updates
-	newEmail := current.Email
-	if email != nil {
-		newEmail = *email
-	}
-	newName := current.Name
-	if name != nil {
-		newName = *name
-	}
-	newAvatarURL := current.AvatarURL
-	if avatarURL != nil {
-		newAvatarURL = *avatarURL
-	}
-	newEmailVerified := current.EmailVerified
-	if emailVerified != nil {
-		newEmailVerified = *emailVerified
-	}
-
 	user := &User{}
-	err = r.db.QueryRow(ctx, `
-		UPDATE users SET email = $3, name = $4, avatar_url = $5, email_verified = $6
+	err := r.db.QueryRow(ctx, `
+		UPDATE users
+		SET
+			email = COALESCE($3, email),
+			name = COALESCE($4, name),
+			avatar_url = COALESCE($5, avatar_url),
+			email_verified = COALESCE($6, email_verified)
 		WHERE id = $1 AND app_id = $2
-		RETURNING id, app_id, email, name, avatar_url, email_verified, created_at, last_login_at
-	`, userID, appID, newEmail, newName, newAvatarURL, newEmailVerified).Scan(
+		RETURNING id, app_id, email, COALESCE(name, ''), COALESCE(avatar_url, ''),
+		          email_verified, created_at, last_login_at
+	`, userID, appID, email, name, avatarURL, emailVerified).Scan(
 		&user.ID, &user.AppID, &user.Email, &user.Name, &user.AvatarURL,
 		&user.EmailVerified, &user.CreatedAt, &user.LastLoginAt,
 	)
@@ -134,20 +124,22 @@ func (r *UserRepository) Delete(ctx context.Context, userID, appID string) error
 }
 
 func (r *UserRepository) List(ctx context.Context, appID string, pageSize int, offset int, providerFilter, emailSearch string) ([]*User, int, error) {
-	// Count total
 	var totalCount int
-	countQuery := `SELECT COUNT(*) FROM users u WHERE u.app_id = $1`
+	countQuery := `SELECT COUNT(*) FROM users WHERE app_id = $1`
 	countArgs := []interface{}{appID}
 	argIdx := 2
 
 	if emailSearch != "" {
-		countQuery += ` AND u.email ILIKE $` + itoa(argIdx)
-		countArgs = append(countArgs, "%"+emailSearch+"%")
+		escapedSearch := strings.ReplaceAll(emailSearch, `\`, `\\`)
+		escapedSearch = strings.ReplaceAll(escapedSearch, `%`, `\%`)
+		escapedSearch = strings.ReplaceAll(escapedSearch, `_`, `\_`)
+		countQuery += ` AND email ILIKE $` + itoa(argIdx)
+		countArgs = append(countArgs, "%"+escapedSearch+"%")
 		argIdx++
 	}
 
 	if providerFilter != "" {
-		countQuery += ` AND EXISTS (SELECT 1 FROM user_identities ui WHERE ui.user_id = u.id AND ui.provider = $` + itoa(argIdx) + `)`
+		countQuery += ` AND EXISTS (SELECT 1 FROM user_identities WHERE user_id = users.id AND provider = $` + itoa(argIdx) + `)`
 		countArgs = append(countArgs, providerFilter)
 		argIdx++
 	}
@@ -157,25 +149,28 @@ func (r *UserRepository) List(ctx context.Context, appID string, pageSize int, o
 		return nil, 0, err
 	}
 
-	// Fetch page
-	query := `SELECT u.id, u.app_id, u.email, u.name, u.avatar_url, u.email_verified, u.created_at, u.last_login_at
-		FROM users u WHERE u.app_id = $1`
+	query := `SELECT id, app_id, email, COALESCE(name, ''), COALESCE(avatar_url, ''),
+	                 email_verified, created_at, last_login_at
+	          FROM users WHERE app_id = $1`
 	args := []interface{}{appID}
 	argIdx = 2
 
 	if emailSearch != "" {
-		query += ` AND u.email ILIKE $` + itoa(argIdx)
-		args = append(args, "%"+emailSearch+"%")
+		escapedSearch := strings.ReplaceAll(emailSearch, `\`, `\\`)
+		escapedSearch = strings.ReplaceAll(escapedSearch, `%`, `\%`)
+		escapedSearch = strings.ReplaceAll(escapedSearch, `_`, `\_`)
+		query += ` AND email ILIKE $` + itoa(argIdx)
+		args = append(args, "%"+escapedSearch+"%")
 		argIdx++
 	}
 
 	if providerFilter != "" {
-		query += ` AND EXISTS (SELECT 1 FROM user_identities ui WHERE ui.user_id = u.id AND ui.provider = $` + itoa(argIdx) + `)`
+		query += ` AND EXISTS (SELECT 1 FROM user_identities WHERE user_id = users.id AND provider = $` + itoa(argIdx) + `)`
 		args = append(args, providerFilter)
 		argIdx++
 	}
 
-	query += ` ORDER BY u.created_at DESC LIMIT $` + itoa(argIdx) + ` OFFSET $` + itoa(argIdx+1)
+	query += ` ORDER BY created_at DESC LIMIT $` + itoa(argIdx) + ` OFFSET $` + itoa(argIdx+1)
 	args = append(args, pageSize, offset)
 
 	rows, err := r.db.Query(ctx, query, args...)
@@ -187,10 +182,8 @@ func (r *UserRepository) List(ctx context.Context, appID string, pageSize int, o
 	var users []*User
 	for rows.Next() {
 		user := &User{}
-		err := rows.Scan(
-			&user.ID, &user.AppID, &user.Email, &user.Name, &user.AvatarURL,
-			&user.EmailVerified, &user.CreatedAt, &user.LastLoginAt,
-		)
+		err := rows.Scan(&user.ID, &user.AppID, &user.Email, &user.Name, &user.AvatarURL,
+			&user.EmailVerified, &user.CreatedAt, &user.LastLoginAt)
 		if err != nil {
 			return nil, 0, err
 		}
@@ -201,5 +194,35 @@ func (r *UserRepository) List(ctx context.Context, appID string, pageSize int, o
 }
 
 func itoa(i int) string {
-	return string(rune('0' + i)) // works for single digit args (up to 9)
+	return strconv.Itoa(i)
+}
+
+func (r *UserRepository) StoreEmailVerificationToken(ctx context.Context, userID, appID, tokenHash string, expiresAt time.Time) error {
+	_, err := r.db.Exec(ctx, `
+		INSERT INTO email_verification_tokens (user_id, app_id, token_hash, expires_at)
+		VALUES ($1, $2, $3, $4)
+	`, userID, appID, tokenHash, expiresAt)
+	return err
+}
+
+func (r *UserRepository) GetEmailVerificationToken(ctx context.Context, tokenHash, appID string) (string, error) {
+	var userID string
+	err := r.db.QueryRow(ctx, `
+		SELECT user_id FROM email_verification_tokens 
+		WHERE token_hash = $1 AND app_id = $2 AND expires_at > NOW()
+	`, tokenHash, appID).Scan(&userID)
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return "", nil
+		}
+		return "", err
+	}
+	return userID, nil
+}
+
+func (r *UserRepository) DeleteEmailVerificationToken(ctx context.Context, tokenHash string) error {
+	_, err := r.db.Exec(ctx, `
+		DELETE FROM email_verification_tokens WHERE token_hash = $1
+	`, tokenHash)
+	return err
 }

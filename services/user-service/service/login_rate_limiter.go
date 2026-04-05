@@ -3,12 +3,11 @@ package service
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"github.com/redis/go-redis/v9"
 )
 
-// LoginRateLimiter blocks login after 5 consecutive failures within 15 minutes.
+// LoginRateLimiter blocks login after 10 consecutive failures within 15 minutes.
 type LoginRateLimiter struct {
 	redis *redis.Client
 }
@@ -36,10 +35,12 @@ func (l *LoginRateLimiter) IsBlocked(ctx context.Context, appID, email string) (
 // RecordFailure increments the failure counter. Resets TTL to 15 min on each failure.
 func (l *LoginRateLimiter) RecordFailure(ctx context.Context, appID, email string) error {
 	k := l.key(appID, email)
-	pipe := l.redis.Pipeline()
-	pipe.Incr(ctx, k)
-	pipe.Expire(ctx, k, 15*time.Minute)
-	_, err := pipe.Exec(ctx)
+	script := `
+		local c = redis.call('INCR', KEYS[1])
+		redis.call('EXPIRE', KEYS[1], ARGV[1])
+		return c
+	`
+	_, err := l.redis.Eval(ctx, script, []string{k}, 15*60).Result()
 	return err
 }
 

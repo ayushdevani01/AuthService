@@ -5,13 +5,17 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
+	"crypto/sha256"
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
+	"net/url"
+	"strings"
 	"time"
 
 	"github.com/ayushdevan01/AuthService/services/user-service/repository"
@@ -24,6 +28,7 @@ var (
 	ErrInvalidState    = errors.New("invalid or expired OAuth state")
 	ErrProviderNotConf = errors.New("OAuth provider not configured for this app")
 	ErrOAuthFailed     = errors.New("OAuth token exchange failed")
+	ErrInvalidVerifier = errors.New("invalid PKCE code verifier")
 )
 
 // OAuthProviderConfig from the oauth_providers table
@@ -35,9 +40,12 @@ type OAuthProviderConfig struct {
 
 // OAuth state stored in Redis
 type oauthState struct {
-	AppID       string `json:"app_id"`
-	Provider    string `json:"provider"`
-	RedirectURI string `json:"redirect_uri"`
+	AppID               string `json:"app_id"`
+	Provider            string `json:"provider"`
+	RedirectURI         string `json:"redirect_uri"`
+	CodeChallenge       string `json:"code_challenge,omitempty"`
+	CodeChallengeMethod string `json:"code_challenge_method,omitempty"`
+	CodeVerifier        string `json:"code_verifier,omitempty"`
 }
 
 // Google user info response
@@ -70,16 +78,21 @@ type OAuthService struct {
 	db            *pgxpool.Pool
 	userService   *UserService
 	encryptionKey string
-	platformURL   string
+	callbackBaseURL string
 }
 
-func NewOAuthService(redisClient *redis.Client, db *pgxpool.Pool, userService *UserService, encryptionKey, platformURL string) *OAuthService {
+func NewOAuthService(redisClient *redis.Client, db *pgxpool.Pool, userService *UserService, encryptionKey, callbackBaseURL string) *OAuthService {
+	parsed, err := url.Parse(callbackBaseURL)
+	if err != nil || (parsed.Scheme != "https" && parsed.Scheme != "http") {
+		log.Fatalf("Invalid platformURL configured: %v", err)
+	}
+
 	return &OAuthService{
 		redisClient:   redisClient,
 		db:            db,
 		userService:   userService,
 		encryptionKey: encryptionKey,
-		platformURL:   platformURL,
+		callbackBaseURL: callbackBaseURL,
 	}
 }
 
@@ -90,7 +103,7 @@ func (s *OAuthService) getProviderConfig(ctx context.Context, appID, provider st
 	err := s.db.QueryRow(ctx, `
 		SELECT client_id, client_secret_encrypted, scopes
 		FROM oauth_providers
-		WHERE app_id = (SELECT id FROM apps WHERE app_id = $1) AND provider = $2 AND enabled = true
+		WHERE app_id = $1 AND provider = $2 AND enabled = true
 	`, appID, provider).Scan(&clientID, &clientSecretEncrypted, &scopes)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -111,11 +124,21 @@ func (s *OAuthService) getProviderConfig(ctx context.Context, appID, provider st
 	}, nil
 }
 
-func (s *OAuthService) InitiateOAuth(ctx context.Context, appID, provider, redirectURI string) (string, string, error) {
+func (s *OAuthService) InitiateOAuth(ctx context.Context, appID, provider, redirectURI, codeChallenge, challengeMethod, codeVerifier string) (string, string, error) {
 	// Verify provider is configured
 	providerConfig, err := s.getProviderConfig(ctx, appID, provider)
 	if err != nil {
 		return "", "", err
+	}
+
+	if codeChallenge == "" {
+		return "", "", errors.New("PKCE code_challenge is required for OAuth")
+	}
+	if codeVerifier == "" {
+		return "", "", errors.New("PKCE code_verifier is required for OAuth")
+	}
+	if challengeMethod == "" {
+		challengeMethod = "S256"
 	}
 
 	// Generate state
@@ -127,14 +150,17 @@ func (s *OAuthService) InitiateOAuth(ctx context.Context, appID, provider, redir
 
 	// Store state in Redis with 10 min TTL
 	stateData, _ := json.Marshal(oauthState{
-		AppID:       appID,
-		Provider:    provider,
-		RedirectURI: redirectURI,
+		AppID:               appID,
+		Provider:            provider,
+		RedirectURI:         redirectURI,
+		CodeChallenge:       codeChallenge,
+		CodeChallengeMethod: challengeMethod,
+		CodeVerifier:        codeVerifier,
 	})
 	s.redisClient.Set(ctx, fmt.Sprintf("oauth_state:%s", state), stateData, 10*time.Minute)
 
 	// Build authorization URL
-	authURL := s.buildAuthorizationURL(provider, providerConfig.ClientID, state, providerConfig.Scopes)
+	authURL := s.buildAuthorizationURL(provider, providerConfig.ClientID, state, providerConfig.Scopes, codeChallenge, challengeMethod)
 
 	return authURL, state, nil
 }
@@ -153,6 +179,14 @@ func (s *OAuthService) HandleOAuthCallback(ctx context.Context, provider, code, 
 		return nil, "", "", false, ErrInvalidState
 	}
 
+	// PKCE Verification
+	if stateData.CodeChallenge == "" {
+		return nil, "", "", false, errors.New("missing PKCE code challenge")
+	}
+	if !verifyPKCE(stateData.CodeChallenge, stateData.CodeChallengeMethod, stateData.CodeVerifier) {
+		return nil, "", "", false, ErrInvalidVerifier
+	}
+
 	// Get provider config
 	providerConfig, err := s.getProviderConfig(ctx, stateData.AppID, provider)
 	if err != nil {
@@ -165,9 +199,9 @@ func (s *OAuthService) HandleOAuthCallback(ctx context.Context, provider, code, 
 
 	switch provider {
 	case "google":
-		email, name, avatarURL, providerUserID, emailVerified, err = s.handleGoogleCallback(ctx, code, providerConfig)
+		email, name, avatarURL, providerUserID, emailVerified, err = s.handleGoogleCallback(ctx, code, stateData.CodeVerifier, providerConfig)
 	case "github":
-		email, name, avatarURL, providerUserID, emailVerified, err = s.handleGithubCallback(ctx, code, providerConfig)
+		email, name, avatarURL, providerUserID, emailVerified, err = s.handleGithubCallback(ctx, code, stateData.CodeVerifier, providerConfig)
 	default:
 		return nil, "", "", false, fmt.Errorf("unsupported provider: %s", provider)
 	}
@@ -182,17 +216,32 @@ func (s *OAuthService) HandleOAuthCallback(ctx context.Context, provider, code, 
 
 	// Create or update user
 	providerUserIDPtr := &providerUserID
-	user, err := s.userService.CreateUser(ctx, stateData.AppID, email, name, avatarURL, provider, providerUserIDPtr, nil, emailVerified)
+	var namePtr, avatarURLPtr *string
+	if name != "" {
+		namePtr = &name
+	}
+	if avatarURL != "" {
+		avatarURLPtr = &avatarURL
+	}
+	user, err := s.userService.CreateUser(ctx, stateData.AppID, email, namePtr, avatarURLPtr, provider, providerUserIDPtr, nil, emailVerified)
 	if err != nil {
-		return nil, "", "", false, err
+		if errors.Is(err, ErrUserExists) {
+			// Race condition: user was created between our check and create. Fetch them.
+			user, err = s.userService.GetUserByEmail(ctx, stateData.AppID, email)
+			if err != nil {
+				return nil, "", "", false, fmt.Errorf("failed to fetch user after create collision: %w", err)
+			}
+		} else {
+			return nil, "", "", false, err
+		}
 	}
 
 	return user, stateData.AppID, stateData.RedirectURI, isNewUser, nil
 }
 
-func (s *OAuthService) handleGoogleCallback(ctx context.Context, code string, config *OAuthProviderConfig) (string, string, string, string, bool, error) {
-	callbackURL := s.platformURL + "/oauth/callback/google"
-	tokenResp, err := exchangeCodeForToken("https://oauth2.googleapis.com/token", code, config.ClientID, config.ClientSecret, callbackURL)
+func (s *OAuthService) handleGoogleCallback(ctx context.Context, code, codeVerifier string, config *OAuthProviderConfig) (string, string, string, string, bool, error) {
+	callbackURL := s.callbackBaseURL + "/oauth/callback/google"
+	tokenResp, err := exchangeCodeForToken("https://oauth2.googleapis.com/token", code, codeVerifier, config.ClientID, config.ClientSecret, callbackURL)
 	if err != nil {
 		return "", "", "", "", false, err
 	}
@@ -219,9 +268,9 @@ func (s *OAuthService) handleGoogleCallback(ctx context.Context, code string, co
 	return userInfo.Email, userInfo.Name, userInfo.Picture, userInfo.ID, userInfo.VerifiedEmail, nil
 }
 
-func (s *OAuthService) handleGithubCallback(ctx context.Context, code string, config *OAuthProviderConfig) (string, string, string, string, bool, error) {
-	callbackURL := s.platformURL + "/oauth/callback/github"
-	tokenResp, err := exchangeCodeForTokenJSON("https://github.com/login/oauth/access_token", code, config.ClientID, config.ClientSecret, callbackURL)
+func (s *OAuthService) handleGithubCallback(ctx context.Context, code, codeVerifier string, config *OAuthProviderConfig) (string, string, string, string, bool, error) {
+	callbackURL := s.callbackBaseURL + "/oauth/callback/github"
+	tokenResp, err := exchangeCodeForTokenJSON("https://github.com/login/oauth/access_token", code, codeVerifier, config.ClientID, config.ClientSecret, callbackURL)
 	if err != nil {
 		return "", "", "", "", false, err
 	}
@@ -290,10 +339,11 @@ func (s *OAuthService) fetchGithubEmail(ctx context.Context, accessToken string)
 }
 
 // exchangeCodeForToken exchanges an authorization code using form POST
-func exchangeCodeForToken(tokenURL, code, clientID, clientSecret, redirectURI string) (map[string]interface{}, error) {
+func exchangeCodeForToken(tokenURL, code, codeVerifier, clientID, clientSecret, redirectURI string) (map[string]interface{}, error) {
 	resp, err := http.PostForm(tokenURL, map[string][]string{
 		"grant_type":    {"authorization_code"},
 		"code":          {code},
+		"code_verifier": {codeVerifier},
 		"client_id":     {clientID},
 		"client_secret": {clientSecret},
 		"redirect_uri":  {redirectURI},
@@ -321,14 +371,16 @@ func exchangeCodeForToken(tokenURL, code, clientID, clientSecret, redirectURI st
 }
 
 // exchangeCodeForTokenJSON is for GitHub which needs Accept: application/json header
-func exchangeCodeForTokenJSON(tokenURL, code, clientID, clientSecret, redirectURI string) (map[string]interface{}, error) {
-	req, _ := http.NewRequest("POST", tokenURL, nil)
-	q := req.URL.Query()
-	q.Set("client_id", clientID)
-	q.Set("client_secret", clientSecret)
-	q.Set("code", code)
-	q.Set("redirect_uri", redirectURI)
-	req.URL.RawQuery = q.Encode()
+func exchangeCodeForTokenJSON(tokenURL, code, codeVerifier, clientID, clientSecret, redirectURI string) (map[string]interface{}, error) {
+	form := url.Values{}
+	form.Set("client_id", clientID)
+	form.Set("client_secret", clientSecret)
+	form.Set("code", code)
+	form.Set("code_verifier", codeVerifier)
+	form.Set("redirect_uri", redirectURI)
+
+	req, _ := http.NewRequest("POST", tokenURL, strings.NewReader(form.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Set("Accept", "application/json")
 
 	resp, err := http.DefaultClient.Do(req)
@@ -355,8 +407,8 @@ func exchangeCodeForTokenJSON(tokenURL, code, clientID, clientSecret, redirectUR
 }
 
 // buildAuthorizationURL builds provider-specific authorization URL
-func (s *OAuthService) buildAuthorizationURL(provider, clientID, state string, scopes []string) string {
-	callbackURL := fmt.Sprintf("%s/oauth/callback/%s", s.platformURL, provider)
+func (s *OAuthService) buildAuthorizationURL(provider, clientID, state string, scopes []string, codeChallenge, challengeMethod string) string {
+	callbackURL := fmt.Sprintf("%s/oauth/callback/%s", s.callbackBaseURL, provider)
 
 	switch provider {
 	case "google":
@@ -365,8 +417,8 @@ func (s *OAuthService) buildAuthorizationURL(provider, clientID, state string, s
 			scopeStr = joinScopes(scopes)
 		}
 		return fmt.Sprintf(
-			"https://accounts.google.com/o/oauth2/v2/auth?client_id=%s&redirect_uri=%s&response_type=code&scope=%s&state=%s&access_type=offline",
-			clientID, callbackURL, scopeStr, state,
+			"https://accounts.google.com/o/oauth2/v2/auth?client_id=%s&redirect_uri=%s&response_type=code&scope=%s&state=%s&access_type=offline&code_challenge=%s&code_challenge_method=%s",
+			clientID, callbackURL, scopeStr, state, codeChallenge, challengeMethod,
 		)
 	case "github":
 		scopeStr := "user:email"
@@ -374,8 +426,8 @@ func (s *OAuthService) buildAuthorizationURL(provider, clientID, state string, s
 			scopeStr = joinScopes(scopes)
 		}
 		return fmt.Sprintf(
-			"https://github.com/login/oauth/authorize?client_id=%s&redirect_uri=%s&scope=%s&state=%s",
-			clientID, callbackURL, scopeStr, state,
+			"https://github.com/login/oauth/authorize?client_id=%s&redirect_uri=%s&scope=%s&state=%s&code_challenge=%s&code_challenge_method=%s",
+			clientID, callbackURL, scopeStr, state, codeChallenge, challengeMethod,
 		)
 	default:
 		return ""
@@ -427,4 +479,14 @@ func decryptAES(ciphertextB64, key string) (string, error) {
 	}
 
 	return string(plaintext), nil
+}
+
+func verifyPKCE(challenge, method, verifier string) bool {
+	if method == "S256" {
+		hash := sha256.Sum256([]byte(verifier))
+		actualChallenge := base64.RawURLEncoding.EncodeToString(hash[:])
+		return actualChallenge == challenge
+	}
+	// Plain method
+	return verifier == challenge
 }

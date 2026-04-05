@@ -61,6 +61,43 @@ func (r *PasswordResetRepository) FindByTokenHash(ctx context.Context, tokenHash
 	return t, nil
 }
 
+func (r *PasswordResetRepository) FindByTokenHashAny(ctx context.Context, tokenHash string) (*PasswordResetToken, error) {
+	t := &PasswordResetToken{}
+	err := r.db.QueryRow(ctx, `
+		SELECT id, user_id, app_id, token_hash, expires_at, used_at, created_at
+		FROM password_reset_tokens
+		WHERE token_hash = $1
+	`, tokenHash).Scan(
+		&t.ID, &t.UserID, &t.AppID, &t.TokenHash,
+		&t.ExpiresAt, &t.UsedAt, &t.CreatedAt,
+	)
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return t, nil
+}
+
+func (r *PasswordResetRepository) ConsumeValidToken(ctx context.Context, tokenHash string) (string, error) {
+	var userID string
+	err := r.db.QueryRow(ctx, `
+		UPDATE password_reset_tokens
+		SET used_at = NOW()
+		WHERE token_hash = $1 AND used_at IS NULL AND expires_at > NOW()
+		RETURNING user_id
+	`, tokenHash).Scan(&userID)
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return "", nil
+		}
+		return "", err
+	}
+
+	return userID, nil
+}
+
 func (r *PasswordResetRepository) MarkUsed(ctx context.Context, tokenID string) error {
 	_, err := r.db.Exec(ctx, `
 		UPDATE password_reset_tokens SET used_at = NOW() WHERE id = $1

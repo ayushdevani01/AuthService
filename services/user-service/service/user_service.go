@@ -11,14 +11,15 @@ import (
 )
 
 var (
-	ErrUserNotFound    = errors.New("user not found")
-	ErrUserExists      = errors.New("user already exists")
-	ErrInvalidPassword = errors.New("invalid password")
-	ErrAccountBlocked  = errors.New("account temporarily blocked due to too many failed login attempts")
+	ErrUserNotFound     = errors.New("user not found")
+	ErrUserExists       = errors.New("user already exists")
+	ErrInvalidPassword  = errors.New("invalid password")
+	ErrAccountBlocked   = errors.New("account temporarily blocked due to too many failed login attempts")
+	ErrEmailNotVerified = errors.New("email not verified")
 )
 
 type UserService struct {
-	userRepo    *repository.UserRepository
+	userRepo     *repository.UserRepository
 	identityRepo *repository.IdentityRepository
 	rateLimiter  *LoginRateLimiter
 }
@@ -31,19 +32,45 @@ func NewUserService(userRepo *repository.UserRepository, identityRepo *repositor
 	}
 }
 
-func (s *UserService) CreateUser(ctx context.Context, appID, email, name, avatarURL, provider string, providerUserID, passwordHash *string, emailVerified bool) (*repository.User, error) {
+func (s *UserService) CreateUser(ctx context.Context, appID, email string, name, avatarURL *string, provider string, providerUserID, passwordHash *string, emailVerified bool) (*repository.User, error) {
 	// Check if user already exists for this app
 	existing, err := s.userRepo.FindByEmail(ctx, appID, email)
 	if err == nil && existing != nil {
 		// User exists — add identity if new provider
 		_, identErr := s.identityRepo.FindByUserAndProvider(ctx, existing.ID, provider)
-		if identErr != nil && errors.Is(identErr, pgx.ErrNoRows) {
-			// Add new identity to existing user (account linking)
-			_, err = s.identityRepo.Create(ctx, existing.ID, provider, providerUserID, passwordHash)
+		if identErr != nil {
+			if errors.Is(identErr, pgx.ErrNoRows) {
+				// Add new identity to existing user (account linking)
+				_, err = s.identityRepo.Create(ctx, existing.ID, provider, providerUserID, passwordHash)
+				if err != nil {
+					return nil, err
+				}
+			} else {
+				return nil, identErr
+			}
+		}
+
+		var updateName, updateAvatarURL *string
+		if name != nil && *name != "" && existing.Name == "" {
+			updateName = name
+		}
+		if avatarURL != nil && *avatarURL != "" && existing.AvatarURL == "" {
+			updateAvatarURL = avatarURL
+		}
+
+		// If OAuth provider confirms email is verified but user is not, update it
+		var updateEmailVerified *bool
+		if emailVerified && !existing.EmailVerified {
+			updateEmailVerified = &emailVerified
+		}
+
+		if updateName != nil || updateAvatarURL != nil || updateEmailVerified != nil {
+			existing, err = s.userRepo.Update(ctx, existing.ID, existing.AppID, nil, updateName, updateAvatarURL, updateEmailVerified)
 			if err != nil {
 				return nil, err
 			}
 		}
+
 		// Update last login
 		s.userRepo.UpdateLastLogin(ctx, existing.ID)
 		return existing, nil
@@ -62,6 +89,10 @@ func (s *UserService) CreateUser(ctx context.Context, appID, email, name, avatar
 	_, err = s.identityRepo.Create(ctx, user.ID, provider, providerUserID, passwordHash)
 	if err != nil {
 		return nil, err
+	}
+	user.Provider = provider
+	if providerUserID != nil {
+		user.ProviderUserID = *providerUserID
 	}
 
 	return user, nil
@@ -105,13 +136,18 @@ func (s *UserService) GetUserByProviderID(ctx context.Context, appID, provider, 
 	return user, nil
 }
 
-func (s *UserService) UpdateUser(ctx context.Context, userID, appID string, email, name, avatarURL *string, emailVerified *bool) (*repository.User, error) {
+func (s *UserService) UpdateUser(ctx context.Context, userID, appID string, email, passwordHash, name, avatarURL *string, emailVerified *bool) (*repository.User, error) {
 	user, err := s.userRepo.Update(ctx, userID, appID, email, name, avatarURL, emailVerified)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, ErrUserNotFound
 		}
 		return nil, err
+	}
+	if passwordHash != nil {
+		if err := s.identityRepo.UpdatePasswordHash(ctx, userID, *passwordHash); err != nil {
+			return nil, err
+		}
 	}
 	return user, nil
 }
@@ -165,6 +201,20 @@ func (s *UserService) RegisterWithEmail(ctx context.Context, appID, email, passw
 		if identErr == nil {
 			return nil, ErrUserExists
 		}
+		if !errors.Is(identErr, pgx.ErrNoRows) {
+			return nil, identErr
+		}
+
+		// If they don't have an email identity, link the new email/password to this account
+		hash, hashErr := hashPassword(password)
+		if hashErr != nil {
+			return nil, hashErr
+		}
+		_, createErr := s.identityRepo.Create(ctx, existing.ID, "email", nil, &hash)
+		if createErr != nil {
+			return nil, createErr
+		}
+		return existing, nil
 	}
 
 	hash, err := hashPassword(password)
@@ -172,7 +222,8 @@ func (s *UserService) RegisterWithEmail(ctx context.Context, appID, email, passw
 		return nil, err
 	}
 
-	user, err := s.userRepo.Create(ctx, appID, email, name, "", false)
+	emptyAvatar := ""
+	user, err := s.userRepo.Create(ctx, appID, email, &name, &emptyAvatar, false)
 	if err != nil {
 		return nil, err
 	}
@@ -185,7 +236,7 @@ func (s *UserService) RegisterWithEmail(ctx context.Context, appID, email, passw
 	return user, nil
 }
 
-func (s *UserService) LoginWithEmail(ctx context.Context, appID, email, password string) (*repository.User, error) {
+func (s *UserService) LoginWithEmail(ctx context.Context, appID, email, password string, requireEmailVerification bool) (*repository.User, error) {
 	blocked, err := s.rateLimiter.IsBlocked(ctx, appID, email)
 	if err != nil {
 		return nil, err
@@ -212,6 +263,10 @@ func (s *UserService) LoginWithEmail(ctx context.Context, appID, email, password
 	if err := bcrypt.CompareHashAndPassword([]byte(*identity.PasswordHash), []byte(password)); err != nil {
 		s.rateLimiter.RecordFailure(ctx, appID, email)
 		return nil, ErrInvalidPassword
+	}
+
+	if requireEmailVerification && !user.EmailVerified {
+		return nil, ErrEmailNotVerified
 	}
 
 	s.rateLimiter.ClearFailures(ctx, appID, email)

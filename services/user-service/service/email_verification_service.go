@@ -44,25 +44,37 @@ func (s *EmailVerificationService) SendVerification(ctx context.Context, appID, 
 	rawToken := hex.EncodeToString(tokenBytes)
 	tokenHash := hashVerifyToken(rawToken)
 
-	redisKey := fmt.Sprintf("verify:%s", tokenHash)
+	redisKey := fmt.Sprintf("verify:%s:%s", appID, tokenHash)
 	s.redis.Set(ctx, redisKey, userID, 24*time.Hour)
+
+	// DB Fallback
+	if err := s.userRepo.StoreEmailVerificationToken(ctx, userID, appID, tokenHash, time.Now().Add(24*time.Hour)); err != nil {
+		// Log error but don't fail, redis might still succeed
+		fmt.Printf("Warning: Failed to store verification token in DB: %v\n", err)
+	}
 
 	if name == "" {
 		name = email
 	}
-	return s.emailSvc.SendEmailVerification(ctx, email, name, rawToken)
+	return s.emailSvc.SendEmailVerification(ctx, appID, email, name, rawToken)
 }
 
 // VerifyEmail validates the token and marks the user's email as verified.
 func (s *EmailVerificationService) VerifyEmail(ctx context.Context, appID, rawToken string) (string, error) {
 	tokenHash := hashVerifyToken(rawToken)
-	redisKey := fmt.Sprintf("verify:%s", tokenHash)
+	redisKey := fmt.Sprintf("verify:%s:%s", appID, tokenHash)
 
 	userID, err := s.redis.Get(ctx, redisKey).Result()
 	if err == redis.Nil {
-		return "", ErrVerifyTokenInvalid
-	}
-	if err != nil {
+		// Fallback to DB
+		userID, err = s.userRepo.GetEmailVerificationToken(ctx, tokenHash, appID)
+		if err != nil {
+			return "", err
+		}
+		if userID == "" {
+			return "", ErrVerifyTokenInvalid
+		}
+	} else if err != nil {
 		return "", err
 	}
 
@@ -74,6 +86,7 @@ func (s *EmailVerificationService) VerifyEmail(ctx context.Context, appID, rawTo
 	}
 
 	s.redis.Del(ctx, redisKey)
+	s.userRepo.DeleteEmailVerificationToken(ctx, tokenHash)
 
 	return userID, nil
 }
