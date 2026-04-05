@@ -13,6 +13,7 @@ import (
 
 	"github.com/ayushdevan01/AuthService/services/token-service/repository"
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/jackc/pgx/v5"
 )
 
 var (
@@ -34,18 +35,23 @@ func NewTokenService(signingKeyRepo *repository.SigningKeyRepository, sessionRep
 }
 
 type TokenPairResult struct {
-	AccessToken          string
-	AccessTokenExpiresAt int64
+	AccessToken           string
+	RefreshToken          string
+	AccessTokenExpiresAt  int64
+	RefreshTokenExpiresAt int64
 }
 
 func (s *TokenService) GenerateTokenPair(ctx context.Context, appID, userID, email, provider string, emailVerified bool, sessionID string, accessTTL, refreshTTL int64) (*TokenPairResult, error) {
+	// Refresh token is created by user-service CreateSession.
+	// This method is only responsible for generating the access token and optionally rotating the refresh token.
+
 	// Set defaults
 	if accessTTL <= 0 {
 		accessTTL = 3600 // 1 hour
 	}
 
 	// Get signing key
-	privateKeyPEM, kid, err := s.signingKeyRepo.GetDecryptedPrivateKey(ctx, appID)
+	privateKeyPEM, kid, _, err := s.signingKeyRepo.GetDecryptedPrivateKey(ctx, appID)
 	if err != nil {
 		return nil, fmt.Errorf("%w: %v", ErrNoSigningKey, err)
 	}
@@ -58,6 +64,7 @@ func (s *TokenService) GenerateTokenPair(ctx context.Context, appID, userID, ema
 
 	now := time.Now()
 	accessExp := now.Add(time.Duration(accessTTL) * time.Second)
+	refreshExp := now.Add(time.Duration(refreshTTL) * time.Second)
 
 	// Build JWT claims
 	claims := jwt.MapClaims{
@@ -81,16 +88,27 @@ func (s *TokenService) GenerateTokenPair(ctx context.Context, appID, userID, ema
 	}
 
 	return &TokenPairResult{
-		AccessToken:          accessToken,
-		AccessTokenExpiresAt: accessExp.Unix(),
+		AccessToken:           accessToken,
+		RefreshToken:          "",
+		AccessTokenExpiresAt:  accessExp.Unix(),
+		RefreshTokenExpiresAt: refreshExp.Unix(),
 	}, nil
 }
 
 func (s *TokenService) RefreshTokens(ctx context.Context, refreshToken, appID string, rotateRefreshToken bool) (string, *string, int64, *int64, error) {
+	// Get signing key to sign the new access token
+	privateKeyPEM, kid, _, err := s.signingKeyRepo.GetDecryptedPrivateKey(ctx, appID)
+	if err != nil {
+		return "", nil, 0, nil, fmt.Errorf("%w: %v", ErrNoSigningKey, err)
+	}
+
 	// Hash the refresh token and find the session
 	refreshHash := repository.HashToken(refreshToken)
 	session, err := s.sessionRepo.FindByRefreshTokenHash(ctx, refreshHash)
 	if err != nil {
+		return "", nil, 0, nil, ErrInvalidRefreshToken
+	}
+	if session.AppID != appID {
 		return "", nil, 0, nil, ErrInvalidRefreshToken
 	}
 
@@ -99,16 +117,13 @@ func (s *TokenService) RefreshTokens(ctx context.Context, refreshToken, appID st
 		return "", nil, 0, nil, ErrInvalidRefreshToken
 	}
 
-	// Get user info for new access token
+	// Get user info for new access token (using internal appID)
 	email, provider, emailVerified, err := s.sessionRepo.GetUserInfo(ctx, session.UserID, appID)
 	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return "", nil, 0, nil, ErrInvalidRefreshToken
+		}
 		return "", nil, 0, nil, fmt.Errorf("failed to get user info: %w", err)
-	}
-
-	// Get signing key
-	privateKeyPEM, kid, err := s.signingKeyRepo.GetDecryptedPrivateKey(ctx, appID)
-	if err != nil {
-		return "", nil, 0, nil, fmt.Errorf("%w: %v", ErrNoSigningKey, err)
 	}
 
 	rsaKey, err := parseRSAPrivateKey(privateKeyPEM)
@@ -170,11 +185,12 @@ func (s *TokenService) RevokeToken(ctx context.Context, token, tokenType, appID 
 		if err != nil {
 			return ErrInvalidRefreshToken
 		}
+		if session.AppID != appID {
+			return ErrInvalidRefreshToken
+		}
 		return s.sessionRepo.Revoke(ctx, session.ID)
 	}
-	// Access tokens are stateless (RS256 JWT) — can't be revoked without a blacklist
-	// For now, we just return success
-	return nil
+	return errors.New("access tokens cannot be revoked directly")
 }
 
 type PublicKeyInfo struct {

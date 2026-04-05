@@ -34,12 +34,10 @@ func NewSigningKeyRepository(db *pgxpool.Pool, encryptionKey string) *SigningKey
 
 func (r *SigningKeyRepository) GetActiveByAppID(ctx context.Context, appID string) (*SigningKey, error) {
 	key := &SigningKey{}
-	// appID here is the public app_id string, need to join with apps table
 	err := r.db.QueryRow(ctx, `
-		SELECT sk.id, sk.app_id, sk.kid, sk.public_key, sk.private_key_encrypted, sk.is_active, sk.created_at, sk.expires_at, sk.rotated_at
-		FROM signing_keys sk
-		JOIN apps a ON a.id = sk.app_id
-		WHERE a.app_id = $1 AND sk.is_active = true
+		SELECT id, app_id, kid, public_key, private_key_encrypted, is_active, created_at, expires_at, rotated_at
+		FROM signing_keys
+		WHERE app_id = $1 AND is_active = true
 	`, appID).Scan(
 		&key.ID, &key.AppID, &key.KID, &key.PublicKey, &key.PrivateKeyEncrypted,
 		&key.IsActive, &key.CreatedAt, &key.ExpiresAt, &key.RotatedAt,
@@ -50,27 +48,26 @@ func (r *SigningKeyRepository) GetActiveByAppID(ctx context.Context, appID strin
 	return key, nil
 }
 
-func (r *SigningKeyRepository) GetDecryptedPrivateKey(ctx context.Context, appID string) (string, string, error) {
+func (r *SigningKeyRepository) GetDecryptedPrivateKey(ctx context.Context, appID string) (string, string, string, error) {
 	key, err := r.GetActiveByAppID(ctx, appID)
 	if err != nil {
-		return "", "", err
+		return "", "", "", err
 	}
 
 	privateKey, err := decryptAES(key.PrivateKeyEncrypted, r.encryptionKey)
 	if err != nil {
-		return "", "", err
+		return "", "", "", err
 	}
 
-	return privateKey, key.KID, nil
+	return privateKey, key.KID, key.AppID, nil
 }
 
 func (r *SigningKeyRepository) ListPublicKeys(ctx context.Context, appID string) ([]*SigningKey, error) {
 	rows, err := r.db.Query(ctx, `
-		SELECT sk.id, sk.app_id, sk.kid, sk.public_key, sk.private_key_encrypted, sk.is_active, sk.created_at, sk.expires_at, sk.rotated_at
-		FROM signing_keys sk
-		JOIN apps a ON a.id = sk.app_id
-		WHERE a.app_id = $1 AND (sk.is_active = true OR (sk.expires_at IS NOT NULL AND sk.expires_at > NOW()))
-		ORDER BY sk.created_at DESC
+		SELECT id, app_id, kid, public_key, is_active, created_at, expires_at, rotated_at
+		FROM signing_keys
+		WHERE app_id = $1 AND (is_active = true OR (expires_at IS NOT NULL AND expires_at > NOW()))
+		ORDER BY created_at DESC
 	`, appID)
 	if err != nil {
 		return nil, err
@@ -81,7 +78,7 @@ func (r *SigningKeyRepository) ListPublicKeys(ctx context.Context, appID string)
 	for rows.Next() {
 		key := &SigningKey{}
 		err := rows.Scan(
-			&key.ID, &key.AppID, &key.KID, &key.PublicKey, &key.PrivateKeyEncrypted,
+			&key.ID, &key.AppID, &key.KID, &key.PublicKey,
 			&key.IsActive, &key.CreatedAt, &key.ExpiresAt, &key.RotatedAt,
 		)
 		if err != nil {

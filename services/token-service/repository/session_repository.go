@@ -155,21 +155,11 @@ func (r *SessionRepository) GetUserInfo(ctx context.Context, userID, appID strin
 		SELECT u.email, COALESCE(ui.provider, 'unknown'), u.email_verified
 		FROM users u
 		LEFT JOIN user_identities ui ON ui.user_id = u.id
-		WHERE u.id = $1 AND u.app_id = (SELECT id FROM apps WHERE app_id = $2)
-		LIMIT 1
+		WHERE u.id = $1 AND u.app_id = $2
+		ORDER BY ui.created_at LIMIT 1
 	`, userID, appID).Scan(&email, &provider, &emailVerified)
 	if err != nil {
-		// Fallback: try without join through apps table
-		err = r.db.QueryRow(ctx, `
-			SELECT u.email, COALESCE(ui.provider, 'unknown'), u.email_verified
-			FROM users u
-			LEFT JOIN user_identities ui ON ui.user_id = u.id
-			WHERE u.id = $1
-			LIMIT 1
-		`, userID).Scan(&email, &provider, &emailVerified)
-		if err != nil {
-			return "", "", false, err
-		}
+		return "", "", false, err
 	}
 	return email, provider, emailVerified, nil
 }
