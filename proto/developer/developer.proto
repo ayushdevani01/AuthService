@@ -21,6 +21,7 @@ service DeveloperService {
   // App Management
   rpc CreateApp(CreateAppRequest) returns (CreateAppResponse);
   rpc GetApp(GetAppRequest) returns (GetAppResponse);
+  rpc GetPublicApp(GetPublicAppRequest) returns (GetPublicAppResponse);
   rpc ListApps(ListAppsRequest) returns (ListAppsResponse);
   rpc UpdateApp(UpdateAppRequest) returns (UpdateAppResponse);
   rpc DeleteApp(DeleteAppRequest) returns (DeleteAppResponse);
@@ -65,7 +66,6 @@ message RegisterRequest {
 message RegisterResponse {
   Developer developer = 1;
   string access_token = 2;
-  string refresh_token = 3;
 }
 
 message LoginRequest {
@@ -76,12 +76,10 @@ message LoginRequest {
 message LoginResponse {
   Developer developer = 1;
   string access_token = 2;
-  string refresh_token = 3;
 }
 
 message LogoutRequest {
   string developer_id = 1;
-  string refresh_token = 2;
 }
 
 message LogoutResponse { bool success = 1; }
@@ -111,6 +109,7 @@ message App {
   repeated string redirect_urls = 6;
   google.protobuf.Timestamp created_at = 7;
   google.protobuf.Timestamp updated_at = 8;
+  bool require_email_verification = 9;
 }
 
 // App Management
@@ -119,6 +118,7 @@ message CreateAppRequest {
   string name = 2;
   string logo_url = 3;
   repeated string redirect_urls = 4;
+  bool require_email_verification = 5;
 }
 
 message CreateAppResponse {
@@ -134,6 +134,13 @@ message GetAppResponse {
   bool found = 2;
 }
 
+message GetPublicAppRequest { string app_id = 1; }
+
+message GetPublicAppResponse {
+  App app = 1;
+  bool found = 2;
+}
+
 message ListAppsRequest { string developer_id = 1; }
 
 message ListAppsResponse { repeated App apps = 1; }
@@ -144,6 +151,7 @@ message UpdateAppRequest {
   optional string name = 3;
   optional string logo_url = 4;
   repeated string redirect_urls = 5;
+  optional bool require_email_verification = 6;
 }
 
 message UpdateAppResponse { App app = 1; }

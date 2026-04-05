@@ -652,7 +652,7 @@ const file_proto_token_token_proto_rawDesc = "" +
 	"\x11GenerateTokenPair\x12\x1f.token.GenerateTokenPairRequest\x1a .token.GenerateTokenPairResponse\x12J\n" +
 	"\rRefreshTokens\x12\x1b.token.RefreshTokensRequest\x1a\x1c.token.RefreshTokensResponse\x12D\n" +
 	"\vRevokeToken\x12\x19.token.RevokeTokenRequest\x1a\x1a.token.RevokeTokenResponse\x12J\n" +
-	"\rGetPublicKeys\x12\x1b.token.GetPublicKeysRequest\x1a\x1c.token.GetPublicKeysResponseB0Z.github.com/ayushdevani/authservice/proto/tokenb\x06proto3"
+	"\rGetPublicKeys\x12\x1b.token.GetPublicKeysRequest\x1a\x1c.token.GetPublicKeysResponseB1Z/github.com/ayushdevan01/AuthService/proto/tokenb\x06proto3"
 
 var (
 	file_proto_token_token_proto_rawDescOnce sync.Once
