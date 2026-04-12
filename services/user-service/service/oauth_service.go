@@ -74,10 +74,10 @@ type githubEmail struct {
 }
 
 type OAuthService struct {
-	redisClient   *redis.Client
-	db            *pgxpool.Pool
-	userService   *UserService
-	encryptionKey string
+	redisClient     *redis.Client
+	db              *pgxpool.Pool
+	userService     *UserService
+	encryptionKey   string
 	callbackBaseURL string
 }
 
@@ -88,10 +88,10 @@ func NewOAuthService(redisClient *redis.Client, db *pgxpool.Pool, userService *U
 	}
 
 	return &OAuthService{
-		redisClient:   redisClient,
-		db:            db,
-		userService:   userService,
-		encryptionKey: encryptionKey,
+		redisClient:     redisClient,
+		db:              db,
+		userService:     userService,
+		encryptionKey:   encryptionKey,
 		callbackBaseURL: callbackBaseURL,
 	}
 }

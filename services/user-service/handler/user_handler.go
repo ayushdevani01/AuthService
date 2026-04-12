@@ -336,15 +336,15 @@ func toProtoUser(u *repository.User) *pb.User {
 		return nil
 	}
 	protoUser := &pb.User{
-		Id:            u.ID,
-		AppId:         u.AppID,
-		Email:         u.Email,
-		Name:          u.Name,
-		AvatarUrl:     u.AvatarURL,
-		Provider:      u.Provider,
+		Id:             u.ID,
+		AppId:          u.AppID,
+		Email:          u.Email,
+		Name:           u.Name,
+		AvatarUrl:      u.AvatarURL,
+		Provider:       u.Provider,
 		ProviderUserId: u.ProviderUserID,
-		EmailVerified: u.EmailVerified,
-		CreatedAt:     timestamppb.New(u.CreatedAt),
+		EmailVerified:  u.EmailVerified,
+		CreatedAt:      timestamppb.New(u.CreatedAt),
 	}
 	if u.LastLoginAt != nil {
 		protoUser.LastLoginAt = timestamppb.New(*u.LastLoginAt)
@@ -366,4 +366,3 @@ func toProtoSession(s *repository.Session) *pb.Session {
 		ExpiresAt: timestamppb.New(s.ExpiresAt),
 	}
 }
-
