@@ -11,16 +11,16 @@ import (
 )
 
 type App struct {
-	ID           string
-	AppID        string
-	DeveloperID  string
-	Name         string
-	LogoURL      string
-	RedirectURLs []string
+	ID                       string
+	AppID                    string
+	DeveloperID              string
+	Name                     string
+	LogoURL                  string
+	RedirectURLs             []string
 	RequireEmailVerification bool
-	APIKeyHash   string
-	CreatedAt    time.Time
-	UpdatedAt    time.Time
+	APIKeyHash               string
+	CreatedAt                time.Time
+	UpdatedAt                time.Time
 }
 
 type AppRepository struct {
