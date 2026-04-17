@@ -1,78 +1,107 @@
 import Link from 'next/link';
-import { ArrowRight, BookOpenText, KeyRound, ShieldCheck, Workflow } from 'lucide-react';
-import { ThemeToggle } from '@/components/ui';
+import { ArrowRight, BookOpenText, Braces, KeyRound, ShieldCheck, Workflow } from 'lucide-react';
+import { CodeTabs, ThemeToggle } from '@/components/ui';
 
-const features = [
+const valueProps = [
   {
-    title: 'Ship authentication surfaces faster',
-    description: 'Create apps, manage OAuth providers, and provision hosted login flows with an interface tuned for developer teams.',
-    icon: KeyRound,
+    title: 'Everything for auth in one workspace',
+    description: 'Create apps, configure providers, rotate keys, inspect users, and integrate your backend without hopping between tools.',
+    icon: Workflow,
   },
   {
-    title: 'Control every identity edge',
-    description: 'Inspect redirect URLs, email verification rules, API keys, signing keys, and end-user activity from one workspace.',
-    icon: ShieldCheck,
-  },
-  {
-    title: 'Integrate with clear docs',
-    description: 'Move from app creation to implementation using a docs section designed around real setup steps instead of marketing fluff.',
+    title: 'A quickstart that answers real questions',
+    description: 'The docs focus on what developers actually need to wire up: which ID goes where, which secrets are one-time, and how verification works.',
     icon: BookOpenText,
+  },
+  {
+    title: 'Verification designed for production',
+    description: 'Use RS256 tokens, JWKS lookup, audience validation, and API-key protected backend verification endpoints.',
+    icon: ShieldCheck,
   },
 ];
 
-const docs = [
+const setupSteps = [
   {
-    title: '1. Create your app first',
-    points: [
-      'In the dashboard, create an application and copy its `app_id`.',
-      'Add every callback URL you will use, including local development and production URLs.',
-      'If your app uses hosted login locally, a common redirect URI is `http://localhost:3000/auth/callback`.',
-      'Turn on “Require verified email” if users must verify before email/password login succeeds.',
+    step: '01',
+    title: 'Create an app in the dashboard',
+    description: 'You will receive a public app ID, an internal audience UUID, and a one-time API key.',
+  },
+  {
+    step: '02',
+    title: 'Register redirect URLs and providers',
+    description: 'Add every callback URL you use locally and in production, then connect Google or GitHub credentials.',
+  },
+  {
+    step: '03',
+    title: 'Add the right values to your app',
+    description: 'Use the public app ID for JWKS and hosted login. Use the internal UUID as the JWT audience.',
+  },
+  {
+    step: '04',
+    title: 'Verify tokens in your backend',
+    description: 'Use the Node SDK or call the verification API with your API key and public app ID.',
+  },
+];
+
+const codeTabs = {
+  env: `AUTH_APP_ID=app_your_public_app_id\nAUTH_AUDIENCE=your-internal-app-uuid\nAUTH_API_URL=http://localhost:8080\nAUTH_ISSUER=https://auth.yourplatform.com`,
+  react: `import { AuthCallbackHandler, AuthGuard, AuthServiceProvider, useAuth } from 'authservice-react';\n\nfunction LoginButton() {\n  const { login } = useAuth();\n  return <button onClick={() => login()}>Sign in</button>;\n}\n\nexport default function App() {\n  return (\n    <AuthServiceProvider\n      appId={process.env.NEXT_PUBLIC_AUTH_APP_ID!}\n      authUrl={process.env.NEXT_PUBLIC_AUTH_URL!}\n      redirectUri={process.env.NEXT_PUBLIC_AUTH_REDIRECT_URI!}\n    >\n      <AuthCallbackHandler />\n      <AuthGuard fallback={<LoginButton />}>\n        <div>Protected app content</div>\n      </AuthGuard>\n    </AuthServiceProvider>\n  );\n}`,
+  node: `import { requireAuth } from 'authservice-node';\n\napp.get('/protected', requireAuth({\n  appId: process.env.AUTH_APP_ID,\n  audience: process.env.AUTH_AUDIENCE,\n  apiUrl: process.env.AUTH_API_URL,\n  issuer: process.env.AUTH_ISSUER,\n}), (req, res) => {\n  res.json({ user: req.auth });\n});`,
+  curl: `curl -X POST http://localhost:8080/api/v1/verify \\\n+  -H "Content-Type: application/json" \\\n+  -H "x-api-key: <your-api-key>" \\\n+  -H "x-app-id: <your-public-app-id>" \\\n+  -d '{\n    "token": "<jwt>",\n    "app_id": "<your-public-app-id>"\n  }'`,
+};
+
+const docSections = [
+  {
+    id: 'identifiers',
+    title: 'Know your identifiers',
+    body: 'This platform intentionally uses two app identifiers. The public app ID is for JWKS lookup and public API requests. The internal UUID is the JWT audience value.',
+    bullets: [
+      '`AUTH_APP_ID` = public app ID like `app_xxx`',
+      '`AUTH_AUDIENCE` = internal app UUID used in `aud`',
+      '`x-api-key` = backend verification API credential',
     ],
   },
   {
-    title: '2. What to put in redirect URI',
-    points: [
-      'Use the exact frontend route where your application receives auth results after login.',
-      'For local dashboard testing, `http://localhost:3000/auth/callback` is the expected callback route in this project.',
-      'Add the same URI both in AuthService app settings and in the Google or GitHub OAuth provider console.',
-      'If you use multiple environments, add each environment-specific redirect URI separately.',
+    id: 'oauth',
+    title: 'Configure OAuth correctly',
+    body: 'Your callback URL must match across AuthService and the provider console. Treat local and production environments as separate entries.',
+    bullets: [
+      'In Google Cloud Console, go to APIs & Services > Credentials > Create Credentials > OAuth client ID.',
+      'Choose Web application, then paste your AuthService callback URL into Authorized redirect URIs.',
+      'In GitHub, go to Settings > Developer settings > OAuth Apps > New OAuth App.',
+      'Paste the same callback URL into Authorization callback URL, then copy the generated Client ID and Client Secret into the dashboard provider form.',
     ],
   },
   {
-    title: '3. Google OAuth credentials',
-    points: [
-      'In Google Cloud Console, create an OAuth 2.0 Client ID for a Web application.',
-      'Set the authorized redirect URI to the same callback you added in AuthService, for example `http://localhost:3000/auth/callback`.',
-      'Copy the Google Client ID and Client Secret into the Providers tab for your AuthService app.',
-      'Use the standard Google scopes shown in the dashboard: `openid`, `email`, and `profile`.',
+    id: 'hosted-login',
+    title: 'Launch hosted login fast',
+    body: 'The hosted login UI receives the public app ID plus the redirect URI, then returns tokens back to your application callback route.',
+    bullets: [
+      'Hosted login runs on `http://localhost:3001` in local development',
+      'Pass `app_id` and `redirect_uri` query params',
+      'Read returned tokens in your callback page and establish your session',
+      'Use the React SDK if you want the provider, callback handler, and auth state management done for you',
     ],
   },
   {
-    title: '4. GitHub OAuth credentials',
-    points: [
-      'In GitHub Developer Settings, create a new OAuth App.',
-      'Set the Authorization callback URL to the exact same redirect URI registered in your AuthService app.',
-      'Copy the GitHub Client ID and Client Secret into the Providers tab for your app.',
-      'Use the dashboard scope presets such as `read:user` and `user:email` unless your product needs more.',
+    id: 'react-sdk',
+    title: 'Use the React SDK for the frontend',
+    body: 'If your app is React or Next.js client-side, the frontend SDK removes most manual auth wiring. You only provide the public app ID, auth URL, and redirect URI.',
+    bullets: [
+      'Wrap your app in `AuthServiceProvider`.',
+      'Render `AuthCallbackHandler` on the callback route.',
+      'Call `useAuth()` for login, logout, access token, and user state.',
+      'Protect app content with `AuthGuard`.',
     ],
   },
   {
-    title: '5. Hosted login integration',
-    points: [
-      'Open the hosted login UI on port `3001` with `app_id` and `redirect_uri` query params.',
-      'Example: `http://localhost:3001/?app_id=YOUR_APP_ID&redirect_uri=http://localhost:3000/auth/callback`.',
-      'After success, AuthService redirects back with tokens in the URL hash.',
-      'Your frontend callback page should read the hash and establish the session for your app.',
-    ],
-  },
-  {
-    title: '6. Keys and production setup',
-    points: [
-      'Store the first API key shown at app creation immediately because it is only revealed once.',
-      'Rotate API keys whenever a secret may have been exposed.',
-      'Rotate signing keys with a grace period so older tokens keep working temporarily during rollout.',
-      'Use the “Include Expired” toggle to inspect both active and expired signing keys when debugging.',
+    id: 'keys',
+    title: 'Handle keys like production secrets',
+    body: 'API keys are only shown once, and signing keys should be rotated with a grace period to avoid breaking live sessions.',
+    bullets: [
+      'Save the API key immediately after app creation',
+      'Rotate API keys if they are ever exposed',
+      'Rotate signing keys with grace periods during rollouts',
     ],
   },
 ];
@@ -80,106 +109,178 @@ const docs = [
 export default function HomePage() {
   return (
     <main className="min-h-screen px-4 py-6 lg:px-6">
-      <div className="mx-auto max-w-[1380px] space-y-5">
-        <header className="glass-panel rounded-[1.6rem] px-6 py-5">
+      <div className="mx-auto max-w-[1380px] space-y-6">
+        <header className="glass-panel rounded-[1.75rem] px-6 py-5">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex items-center gap-4">
-              <div className="flex h-11 w-11 items-center justify-center rounded-xl border border-[var(--border)] bg-app-panel text-foreground">A</div>
+              <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-[var(--border)] bg-app-panel text-sm font-semibold text-foreground">AS</div>
               <div>
                 <p className="text-xs uppercase tracking-[0.35em] text-muted">AuthService</p>
-                <p className="text-sm text-muted">Premium authentication infrastructure for product teams</p>
+                <p className="text-sm text-muted">Authentication infrastructure with a dashboard, hosted login, and backend verification.</p>
               </div>
             </div>
             <div className="flex flex-wrap items-center gap-3">
               <ThemeToggle />
-              <Link href="#docs" className="button-secondary">Docs</Link>
+              <Link href="#quickstart" className="button-secondary">Quickstart</Link>
               <Link href="/login" className="button-secondary">Developer Login</Link>
               <Link href="/dashboard" className="button-primary">Open Dashboard</Link>
             </div>
           </div>
         </header>
 
-        <section className="glass-panel overflow-hidden rounded-[1.6rem] px-6 py-12 lg:px-10 lg:py-16">
-          <div className="grid gap-10 lg:grid-cols-[1.1fr_0.9fr] lg:items-end">
-            <div>
-              <p className="text-xs uppercase tracking-[0.45em] text-muted">Developer-First Identity</p>
-              <h1 className="mt-6 max-w-4xl text-5xl font-semibold leading-[0.96] text-foreground lg:text-7xl">Authentication infrastructure with the calm precision of a premium developer tool.</h1>
-              <p className="mt-7 max-w-2xl text-[15px] leading-7 text-muted lg:text-[17px]">Build original authentication workflows with a dark-first marketing surface, light-mode dashboard support, clear integration steps, and focused operational controls.</p>
-              <div className="mt-8 flex flex-wrap items-center gap-3">
-                <Link href="/dashboard" className="button-primary"><ArrowRight className="mr-2 h-4 w-4" />Start in dashboard</Link>
-                <Link href="#docs" className="button-secondary">Read the docs</Link>
+        <section className="grid gap-5 xl:grid-cols-[1.15fr_0.85fr]">
+          <div className="glass-panel rounded-[1.9rem] px-7 py-8 lg:px-10 lg:py-10">
+            <div className="max-w-3xl space-y-6">
+              <div className="inline-flex items-center gap-2 rounded-full border border-[var(--border)] bg-[var(--background-alt)] px-3 py-1.5 text-xs text-muted">
+                <BookOpenText className="h-3.5 w-3.5" />
+                Docs-first auth platform
+              </div>
+              <div className="space-y-4">
+                <h1 className="max-w-4xl text-4xl font-semibold tracking-tight text-foreground lg:text-6xl">
+                  Docs that explain the integration, not just the product.
+                </h1>
+                <p className="max-w-2xl text-base leading-7 text-muted lg:text-lg">
+                  AuthService gives product teams a cleaner path from app creation to production-ready token verification. The homepage now mirrors the way strong docs products work: fast context, clear setup order, and real implementation examples.
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-3">
+                <Link href="#quickstart" className="button-primary">
+                  Start with the quickstart
+                  <ArrowRight className="ml-2 h-4 w-4" />
+                </Link>
+                <Link href="/dashboard" className="button-secondary">See the developer dashboard</Link>
               </div>
             </div>
+          </div>
 
-            <div className="rounded-[1.25rem] border border-[var(--border)] bg-app-panel p-5">
-              <div className="rounded-[1.1rem] border border-[var(--border)] bg-[var(--background-alt)] p-5">
-                <div className="flex items-center justify-between border-b border-[var(--border)] pb-4">
-                  <div>
-                    <p className="text-sm font-medium text-foreground">Identity Control Plane</p>
-                    <p className="text-sm text-muted">Apps, OAuth, users, keys, and hosted login</p>
-                  </div>
-                  <Workflow className="h-5 w-5 text-muted" />
+          <aside className="luxury-card rounded-[1.9rem] p-6 lg:p-7">
+            <div className="space-y-4">
+              <p className="text-xs uppercase tracking-[0.35em] text-muted">Integration Snapshot</p>
+              <h2 className="text-2xl font-semibold text-foreground">What developers need on day one</h2>
+              <div className="space-y-3">
+                <div className="rounded-2xl border border-[var(--border)] bg-[var(--background-alt)] p-4">
+                  <p className="text-xs uppercase tracking-[0.3em] text-muted">Public App ID</p>
+                  <p className="mt-2 text-sm text-foreground">Used for JWKS lookup, hosted login, and public API requests.</p>
                 </div>
-                <div className="mt-5 space-y-3 text-sm">
-                  {[
-                    'Create an app and store the first API key securely',
-                    'Enable Google or GitHub with curated scopes',
-                    'Choose email verification rules per app',
-                    'Use hosted login with redirect hashes for tokens',
-                  ].map((item, index) => (
-                    <div key={item} className="flex items-start gap-3 rounded-xl border border-[var(--border)] px-4 py-3 text-muted">
-                      <span className="w-5 text-[11px] uppercase tracking-[0.22em] text-foreground/80">0{index + 1}</span>
-                      <span>{item}</span>
+                <div className="rounded-2xl border border-[var(--border)] bg-[var(--background-alt)] p-4">
+                  <p className="text-xs uppercase tracking-[0.3em] text-muted">Audience UUID</p>
+                  <p className="mt-2 text-sm text-foreground">Used as the expected JWT `aud` value in backend verification.</p>
+                </div>
+                <div className="rounded-2xl border border-[var(--border)] bg-[var(--background-alt)] p-4">
+                  <p className="text-xs uppercase tracking-[0.3em] text-muted">Verify API Key</p>
+                  <p className="mt-2 text-sm text-foreground">Required when calling the REST verification endpoint from your backend.</p>
+                </div>
+              </div>
+            </div>
+          </aside>
+        </section>
+
+        <section className="grid gap-4 md:grid-cols-3">
+          {valueProps.map((item) => {
+            const Icon = item.icon;
+            return (
+              <div key={item.title} className="luxury-card rounded-[1.5rem] p-6">
+                <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-[var(--border)] bg-[var(--background-alt)] text-foreground">
+                  <Icon className="h-5 w-5" />
+                </div>
+                <h3 className="mt-5 text-lg font-medium text-foreground">{item.title}</h3>
+                <p className="mt-2 text-sm leading-6 text-muted">{item.description}</p>
+              </div>
+            );
+          })}
+        </section>
+
+        <section id="quickstart" className="grid gap-5 xl:grid-cols-[0.82fr_1.18fr]">
+          <div className="luxury-card rounded-[1.9rem] p-7">
+            <p className="text-xs uppercase tracking-[0.35em] text-muted">Quickstart</p>
+            <h2 className="mt-3 text-3xl font-semibold text-foreground">A setup flow developers can scan in one minute</h2>
+            <div className="mt-8 space-y-5">
+              {setupSteps.map((item) => (
+                <div key={item.step} className="flex gap-4">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-[var(--border)] bg-[var(--background-alt)] text-sm font-semibold text-foreground">
+                    {item.step}
+                  </div>
+                  <div>
+                    <p className="text-base font-medium text-foreground">{item.title}</p>
+                    <p className="mt-1 text-sm leading-6 text-muted">{item.description}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="luxury-card rounded-[1.9rem] p-7">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <p className="text-xs uppercase tracking-[0.35em] text-muted">Reference Snippets</p>
+                <h2 className="mt-3 text-3xl font-semibold text-foreground">Copy the contract exactly</h2>
+              </div>
+              <div className="inline-flex items-center gap-2 rounded-full border border-[var(--border)] bg-[var(--background-alt)] px-3 py-1.5 text-xs text-muted">
+                <Braces className="h-3.5 w-3.5" />
+                Node SDK + REST verify
+              </div>
+            </div>
+            <div className="mt-6">
+              <CodeTabs
+                defaultTab="env"
+                tabs={[
+                  { key: 'env', label: 'Environment', code: codeTabs.env },
+                  { key: 'react', label: 'React SDK', code: codeTabs.react },
+                  { key: 'node', label: 'Node SDK', code: codeTabs.node },
+                  { key: 'curl', label: 'Verify API', code: codeTabs.curl },
+                ]}
+              />
+            </div>
+          </div>
+        </section>
+
+        <section id="docs" className="grid gap-5 xl:grid-cols-[260px_minmax(0,1fr)]">
+          <aside className="luxury-card hidden h-fit rounded-[1.75rem] p-5 xl:block xl:sticky xl:top-6">
+            <p className="text-xs uppercase tracking-[0.35em] text-muted">In this guide</p>
+            <nav className="mt-5 space-y-2 text-sm">
+              {docSections.map((section) => (
+                <a key={section.id} href={`#${section.id}`} className="block rounded-xl px-3 py-2 text-muted transition hover:bg-[var(--background-alt)] hover:text-foreground">
+                  {section.title}
+                </a>
+              ))}
+            </nav>
+          </aside>
+
+          <div className="space-y-5">
+            {docSections.map((section) => (
+              <article id={section.id} key={section.id} className="luxury-card rounded-[1.75rem] p-7 lg:p-8">
+                <h3 className="text-2xl font-semibold text-foreground">{section.title}</h3>
+                <p className="mt-3 max-w-3xl text-sm leading-7 text-muted">{section.body}</p>
+                <div className="mt-6 grid gap-3 md:grid-cols-1">
+                  {section.bullets.map((bullet) => (
+                    <div key={bullet} className="rounded-2xl border border-[var(--border)] bg-[var(--background-alt)] px-4 py-4 text-sm leading-6 text-foreground">
+                      {bullet}
                     </div>
                   ))}
                 </div>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <section className="grid gap-4 lg:grid-cols-3">
-          {features.map(({ title, description, icon: Icon }) => (
-            <article key={title} className="luxury-card p-6">
-              <Icon className="h-5 w-5 text-foreground" />
-              <h2 className="mt-5 text-[1.15rem] font-medium text-foreground">{title}</h2>
-              <p className="mt-3 text-sm leading-6 text-muted">{description}</p>
-            </article>
-          ))}
-        </section>
-
-        <section id="docs" className="glass-panel rounded-[1.6rem] px-6 py-10 lg:px-10">
-          <div className="max-w-3xl">
-            <p className="text-xs uppercase tracking-[0.45em] text-muted">Docs</p>
-            <h2 className="mt-4 max-w-4xl text-4xl font-semibold leading-tight text-foreground">Everything a developer needs to configure OAuth correctly</h2>
-            <p className="mt-4 text-base leading-7 text-muted">This docs section is written to answer the practical setup questions developers actually hit: what redirect URI to use, where to create credentials, what values to paste into providers, and how hosted login behaves.</p>
-          </div>
-          <div className="mt-8 grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
-            {docs.map((section) => (
-              <article key={section.title} className="rounded-[1.1rem] border border-[var(--border)] bg-app-panel p-6">
-                <h3 className="text-lg font-medium text-foreground">{section.title}</h3>
-                <ul className="mt-4 space-y-3 text-sm leading-6 text-muted">
-                  {section.points.map((point) => (
-                    <li key={point} className="rounded-xl border border-[var(--border)] px-4 py-3">{point}</li>
-                  ))}
-                </ul>
               </article>
             ))}
           </div>
         </section>
 
-        <footer className="glass-panel rounded-[1.6rem] px-6 py-8 lg:px-10">
-          <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+        <section className="glass-panel rounded-[1.75rem] px-7 py-8 lg:px-10">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div>
-              <p className="text-xs uppercase tracking-[0.35em] text-muted">AuthService</p>
-              <p className="mt-3 max-w-2xl text-sm leading-6 text-muted">A developer-focused authentication platform with original functionality and a premium monochrome presentation across marketing, docs, dashboard, and hosted login.</p>
+              <p className="text-xs uppercase tracking-[0.35em] text-muted">Next Step</p>
+              <h2 className="mt-2 text-3xl font-semibold text-foreground">Create an app and copy the integration values from the dashboard</h2>
+              <p className="mt-3 max-w-2xl text-sm leading-7 text-muted">
+                The dashboard now surfaces the public app ID, audience UUID, and API key separately so developers do not have to guess which value belongs in the SDK, JWKS route, or verify API.
+              </p>
             </div>
             <div className="flex flex-wrap gap-3">
-              <Link href="/dashboard" className="button-primary">Dashboard</Link>
-              <Link href="/login" className="button-secondary">Developer Sign In</Link>
+              <Link href="/register" className="button-secondary">Create developer account</Link>
+              <Link href="/dashboard" className="button-primary">
+                Open dashboard
+                <ArrowRight className="ml-2 h-4 w-4" />
+              </Link>
             </div>
           </div>
-        </footer>
+        </section>
       </div>
     </main>
   );

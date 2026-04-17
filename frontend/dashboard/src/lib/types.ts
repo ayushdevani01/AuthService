@@ -9,6 +9,12 @@ export type Developer = {
 export type AppRecord = {
   id: string;
   app_id: string;
+  public_app_id?: string;
+  audience_app_id?: string;
+  identifier_usage?: {
+    public_app_id?: string;
+    audience_app_id?: string;
+  };
   developer_id: string;
   name: string;
   logo_url?: string;
@@ -16,6 +22,16 @@ export type AppRecord = {
   require_email_verification: boolean;
   created_at: string;
   updated_at: string;
+};
+
+export type AppIntegrationInfo = {
+  public_app_id: string;
+  audience_app_id: string;
+  verify_api_key: string;
+  jwks_url: string;
+  verify_endpoint: string;
+  userinfo_endpoint: string;
+  notes: string[];
 };
 
 export type SigningKey = {

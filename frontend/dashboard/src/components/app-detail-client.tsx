@@ -12,7 +12,7 @@ import { Button, Card, ConfirmModal, Input, PillMultiSelect, SectionHeading, Tex
 
 type Props = { appId: string };
 type TabKey = 'overview' | 'settings' | 'providers' | 'users' | 'keys';
-type ConfirmState = { type: 'delete-app' | 'delete-provider' | 'rotate-api-key' | 'save-settings' | 'save-provider'; providerName?: string } | null;
+type ConfirmState = { type: 'delete-app' | 'delete-provider' | 'rotate-api-key' | 'rotate-signing-keys' | 'save-settings' | 'save-provider'; providerName?: string } | null;
 
 const tabs: TabKey[] = ['overview', 'settings', 'providers', 'users', 'keys'];
 
@@ -25,6 +25,24 @@ const providerScopeDefaults = {
   google: ['openid', 'email', 'profile'],
   github: ['read:user', 'user:email'],
 } as const;
+
+function summarizePublicKey(publicKey: string) {
+  const lines = publicKey.split('\n').map((line) => line.trim()).filter(Boolean);
+  if (lines.length <= 2) return publicKey;
+
+  const body = lines.filter((line) => !line.includes('BEGIN RSA PUBLIC KEY') && !line.includes('END RSA PUBLIC KEY'));
+  if (body.length === 0) return publicKey;
+
+  const first = body[0];
+  const last = body[body.length - 1];
+  return `${first.slice(0, 20)}...${last.slice(Math.max(last.length - 20, 0))}`;
+}
+
+function extractPublicKeyBody(publicKey: string) {
+  const lines = publicKey.split('\n').map((line) => line.trim()).filter(Boolean);
+  const body = lines.filter((line) => !line.includes('BEGIN RSA PUBLIC KEY') && !line.includes('END RSA PUBLIC KEY'));
+  return body.join('\n');
+}
 
 export function AppDetailClient({ appId }: Props) {
   const router = useRouter();
@@ -247,6 +265,7 @@ export function AppDetailClient({ appId }: Props) {
     if (!confirmState) return;
     if (confirmState.type === 'delete-app') return void deleteApp();
     if (confirmState.type === 'rotate-api-key') return void rotateApiKey();
+    if (confirmState.type === 'rotate-signing-keys') return void rotateKeys();
     if (confirmState.type === 'save-settings') return void saveSettings();
     if (confirmState.type === 'save-provider') return void createOrUpdateProvider();
     if (confirmState.type === 'delete-provider' && confirmState.providerName) return void removeProvider(confirmState.providerName);
@@ -286,31 +305,47 @@ export function AppDetailClient({ appId }: Props) {
       </Card>
 
       {activeTab === 'overview' ? (
-        <div className="grid gap-6 xl:grid-cols-2">
-          <Card className="space-y-5 p-8">
-            <div>
-              <p className="text-sm text-muted">Public App ID</p>
-              <div className="mt-3 flex items-center gap-3">
-                <p className="break-all text-lg text-foreground">{app.app_id}</p>
-                <Button variant="secondary" onClick={() => copyToClipboard(app.app_id).then(() => toast.success('App ID copied'))}><Copy className="mr-2 h-4 w-4" />Copy</Button>
+        <div className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
+          <Card className="space-y-6 p-8">
+            <SectionHeading eyebrow="Integration" title="The exact values this app needs" description="Treat this page like your control plane reference. Each value below has a specific job in the integration." />
+            <div className="grid gap-4">
+              <div className="rounded-3xl border border-[var(--border)] bg-[var(--background-alt)] p-5">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <p className="text-xs uppercase tracking-[0.3em] text-muted">Public App ID</p>
+                    <p className="mt-2 break-all text-base text-foreground">{app.public_app_id || app.app_id}</p>
+                    <p className="mt-2 text-sm text-muted">Use this for JWKS lookup, hosted login, and `x-app-id` on public verification requests.</p>
+                  </div>
+                  <Button variant="secondary" onClick={() => copyToClipboard(app.public_app_id || app.app_id).then(() => toast.success('Public app ID copied'))}><Copy className="mr-2 h-4 w-4" />Copy</Button>
+                </div>
+              </div>
+
+              <div className="rounded-3xl border border-[var(--border)] bg-[var(--background-alt)] p-5">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <p className="text-xs uppercase tracking-[0.3em] text-muted">Audience App ID</p>
+                    <p className="mt-2 break-all text-base text-foreground">{app.audience_app_id || app.id}</p>
+                    <p className="mt-2 text-sm text-muted">Use this as the expected JWT `aud` value in the Node SDK or any backend verifier.</p>
+                  </div>
+                  <Button variant="secondary" onClick={() => copyToClipboard(app.audience_app_id || app.id).then(() => toast.success('Audience app ID copied'))}><Copy className="mr-2 h-4 w-4" />Copy</Button>
+                </div>
               </div>
             </div>
-            <div>
-              <p className="text-sm text-muted">Internal ID</p>
-              <div className="mt-3 flex items-center gap-3">
-                <p className="break-all text-sm text-foreground">{app.id}</p>
-                <Button variant="secondary" onClick={() => copyToClipboard(app.id).then(() => toast.success('Internal ID copied'))}><Copy className="mr-2 h-4 w-4" />Copy</Button>
-              </div>
-            </div>
+
             <div className="grid gap-4 md:grid-cols-2">
               <div className="rounded-3xl border border-[var(--border)] bg-[var(--background-alt)] p-5">
-                <p className="text-sm text-muted">Created</p>
-                <p className="mt-2 text-foreground">{formatDate(app.created_at)}</p>
+                <p className="text-xs uppercase tracking-[0.3em] text-muted">Created</p>
+                <p className="mt-3 text-sm text-foreground">{formatDate(app.created_at)}</p>
               </div>
               <div className="rounded-3xl border border-[var(--border)] bg-[var(--background-alt)] p-5">
-                <p className="text-sm text-muted">Updated</p>
-                <p className="mt-2 text-foreground">{formatDate(app.updated_at)}</p>
+                <p className="text-xs uppercase tracking-[0.3em] text-muted">Updated</p>
+                <p className="mt-3 text-sm text-foreground">{formatDate(app.updated_at)}</p>
               </div>
+            </div>
+
+            <div className="rounded-3xl border border-[var(--border)] bg-[#0a0a0a] p-5 text-zinc-100">
+              <p className="text-xs uppercase tracking-[0.3em] text-zinc-400">Suggested Environment</p>
+              <pre className="mt-4 overflow-x-auto whitespace-pre-wrap font-mono text-[13px] leading-6">{`AUTH_APP_ID=${app.public_app_id || app.app_id}\nAUTH_AUDIENCE=${app.audience_app_id || app.id}\nAUTH_API_URL=http://localhost:8080\nAUTH_ISSUER=https://auth.yourplatform.com`}</pre>
             </div>
           </Card>
 
@@ -322,6 +357,14 @@ export function AppDetailClient({ appId }: Props) {
             <div className="flex flex-wrap gap-3">
               <Button variant="secondary" onClick={() => copyToClipboard(hostedLoginUrl).then(() => toast.success('Hosted login URL copied'))}><Copy className="mr-2 h-4 w-4" />Copy URL</Button>
               <a className="button-primary" href={hostedLoginUrl} target="_blank" rel="noreferrer"><ExternalLink className="mr-2 h-4 w-4" />Open Login UI</a>
+            </div>
+            <div className="rounded-3xl border border-[var(--border)] bg-[var(--background-alt)] p-5">
+              <p className="text-xs uppercase tracking-[0.3em] text-muted">Verification Checklist</p>
+              <div className="mt-4 space-y-3 text-sm text-foreground">
+                <p>1. Use the public app ID for the JWKS route.</p>
+                <p>2. Use the audience app ID for JWT `aud` validation.</p>
+                <p>3. Use your API key when calling `POST /api/v1/verify`.</p>
+              </div>
             </div>
             <div>
               <p className="text-sm text-muted">Redirect URLs</p>
@@ -482,7 +525,13 @@ export function AppDetailClient({ appId }: Props) {
                     <p>Expires: {formatDate(key.expires_at)}</p>
                     <p>Rotated: {formatDate(key.rotated_at)}</p>
                   </div>
-                  <pre className="mt-4 overflow-x-auto rounded-2xl border border-[var(--border)] bg-[var(--background-alt)] p-4 text-xs text-muted">{key.public_key}</pre>
+                  <div className="mt-4 rounded-2xl border border-[var(--border)] bg-[var(--background-alt)] p-4">
+                    <div className="flex items-center justify-between gap-4">
+                      <p className="text-xs uppercase tracking-[0.3em] text-muted">RSA Public Key</p>
+                      <Button variant="secondary" onClick={() => copyToClipboard(extractPublicKeyBody(key.public_key)).then(() => toast.success('Public key copied'))}><Copy className="mr-2 h-4 w-4" />Copy</Button>
+                    </div>
+                    <p className="mt-4 break-all font-mono text-xs text-muted">{summarizePublicKey(key.public_key)}</p>
+                  </div>
                 </div>
               ))}
               {keys.length === 0 ? <p className="text-sm text-muted">No keys returned.</p> : null}
@@ -507,7 +556,7 @@ export function AppDetailClient({ appId }: Props) {
             <Card className="space-y-4 p-8">
               <SectionHeading eyebrow="Key Rotation" title="Rotate signing keys" description="Set a grace period in hours. The backend defaults to 24 if omitted or invalid." />
               <Input type="number" min="1" value={gracePeriodHours} onChange={(event) => setGracePeriodHours(event.target.value)} />
-              <Button onClick={rotateKeys}><RotateCcw className="mr-2 h-4 w-4" />Rotate Signing Keys</Button>
+              <Button onClick={() => setConfirmState({ type: 'rotate-signing-keys' })}><RotateCcw className="mr-2 h-4 w-4" />Rotate Signing Keys</Button>
             </Card>
           </div>
         </div>
@@ -524,7 +573,9 @@ export function AppDetailClient({ appId }: Props) {
                 ? 'Save application changes?'
                 : confirmState?.type === 'save-provider'
                   ? `Confirm ${confirmState.providerName} provider changes?`
-                  : 'Rotate API key?'
+                  : confirmState?.type === 'rotate-signing-keys'
+                    ? 'Rotate signing keys?'
+                    : 'Rotate API key?'
         }
         description={
           confirmState?.type === 'delete-app'
@@ -535,9 +586,11 @@ export function AppDetailClient({ appId }: Props) {
                 ? 'This updates the application metadata and redirect configuration.'
                 : confirmState?.type === 'save-provider'
                   ? 'This will create or update the selected provider using the chosen scopes.'
-                  : 'A new API key will be generated and shown once. Save it immediately.'
+                  : confirmState?.type === 'rotate-signing-keys'
+                    ? `A new signing key will be generated. Existing tokens continue working during the ${gracePeriodHours || '24'} hour grace period.`
+                    : 'A new API key will be generated and shown once. Save it immediately.'
         }
-        confirmLabel={confirmState?.type === 'rotate-api-key' ? 'Rotate Key' : 'Confirm'}
+        confirmLabel={confirmState?.type === 'rotate-api-key' || confirmState?.type === 'rotate-signing-keys' ? 'Rotate Key' : 'Confirm'}
         loading={confirmLoading || savingSettings || providerLoading}
         onCancel={() => setConfirmState(null)}
         onConfirm={handleConfirmAction}

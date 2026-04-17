@@ -110,6 +110,14 @@ export function DashboardClient() {
             <Toggle checked={form.require_email_verification} onChange={(checked) => setForm((current) => ({ ...current, require_email_verification: checked }))} label="Require verified email before login" />
             <Button type="submit" className="w-full justify-center"><Plus className="mr-2 h-4 w-4" />Create New App</Button>
           </form>
+          <div className="mt-6 rounded-3xl border border-[var(--border)] bg-[var(--background-alt)] p-5">
+            <p className="text-xs uppercase tracking-[0.3em] text-muted">What you will receive</p>
+            <div className="mt-4 space-y-3 text-sm text-foreground">
+              <p>Public app ID for JWKS, hosted login, and public verification requests.</p>
+              <p>Audience app ID for JWT `aud` validation.</p>
+              <p>One-time API key for backend verification API calls.</p>
+            </div>
+          </div>
           {newApiKey ? (
             <div className="mt-6 rounded-3xl border border-[var(--border)] bg-app-panel p-5">
               <div className="flex items-start justify-between gap-4">
@@ -140,14 +148,18 @@ export function DashboardClient() {
                     <p className="text-lg font-medium text-foreground">{app.name}</p>
                     <p className="mt-1 text-sm text-muted">Created {formatDate(app.created_at)}</p>
                   </div>
-                  <Button type="button" variant="ghost" className="shrink-0" onClick={(event) => { event.preventDefault(); void copyToClipboard(app.app_id).then(() => toast.success('App ID copied')); }}><Copy className="mr-2 h-4 w-4" />Copy ID</Button>
+                  <Button type="button" variant="ghost" className="shrink-0" onClick={(event) => { event.preventDefault(); void copyToClipboard(app.public_app_id || app.app_id).then(() => toast.success('Public app ID copied')); }}><Copy className="mr-2 h-4 w-4" />Copy Public ID</Button>
                 </div>
                 <div className="mt-6 grid gap-3 md:grid-cols-2">
                   <div className="rounded-2xl border border-[var(--border)] bg-[var(--background-alt)] p-4">
-                    <p className="text-xs uppercase tracking-[0.3em] text-muted">App ID</p>
-                    <p className="mt-3 break-all text-sm text-foreground">{app.app_id}</p>
+                    <p className="text-xs uppercase tracking-[0.3em] text-muted">Public App ID</p>
+                    <p className="mt-3 break-all text-sm text-foreground">{app.public_app_id || app.app_id}</p>
                   </div>
                   <div className="rounded-2xl border border-[var(--border)] bg-[var(--background-alt)] p-4">
+                    <p className="text-xs uppercase tracking-[0.3em] text-muted">Audience App ID</p>
+                    <p className="mt-3 break-all text-sm text-foreground">{app.audience_app_id || app.id}</p>
+                  </div>
+                  <div className="rounded-2xl border border-[var(--border)] bg-[var(--background-alt)] p-4 md:col-span-2">
                     <p className="text-xs uppercase tracking-[0.3em] text-muted">Redirect URLs</p>
                     <p className="mt-3 text-sm text-foreground">{app.redirect_urls?.length || 0} configured</p>
                   </div>
