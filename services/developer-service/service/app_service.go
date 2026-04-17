@@ -115,6 +115,10 @@ func (s *AppService) DeleteApp(ctx context.Context, appID, developerID string) e
 	return s.appRepo.Delete(ctx, app.ID)
 }
 
+func (s *AppService) VerifyAPIKey(ctx context.Context, appID, apiKey string) (bool, error) {
+	return s.appRepo.VerifyAPIKey(ctx, appID, apiKey)
+}
+
 func (s *AppService) RotateAPIKey(ctx context.Context, appID, developerID string) (string, error) {
 	app, err := s.appRepo.FindByID(ctx, appID)
 	if err != nil {

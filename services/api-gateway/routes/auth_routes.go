@@ -583,6 +583,12 @@ func (ar *AuthRoutes) VerifyToken(c *gin.Context) {
 		return
 	}
 
+	resolvedAppID, err := ar.appResolver.ResolveAppID(c, req.AppID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid app_id"})
+		return
+	}
+
 	token, err := jwt.Parse(req.Token, func(token *jwt.Token) (interface{}, error) {
 		if _, ok := token.Method.(*jwt.SigningMethodRSA); !ok {
 			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
@@ -593,10 +599,6 @@ func (ar *AuthRoutes) VerifyToken(c *gin.Context) {
 			return nil, fmt.Errorf("missing kid in token header")
 		}
 
-		resolvedAppID, err := ar.appResolver.ResolveAppID(c, req.AppID)
-		if err != nil {
-			return nil, fmt.Errorf("invalid app_id")
-		}
 		// Fetch public keys from token service
 		resp, err := ar.tokenClient.GetPublicKeys(c.Request.Context(), &pbToken.GetPublicKeysRequest{
 			AppId: resolvedAppID,
@@ -618,7 +620,7 @@ func (ar *AuthRoutes) VerifyToken(c *gin.Context) {
 		}
 
 		return nil, fmt.Errorf("public key '%s' not found for app '%s'", kid, req.AppID)
-	})
+	}, jwt.WithIssuer("https://auth.yourplatform.com"), jwt.WithAudience(resolvedAppID))
 
 	if err != nil || !token.Valid {
 		errMsg := "invalid token"
@@ -636,6 +638,32 @@ func (ar *AuthRoutes) VerifyToken(c *gin.Context) {
 		"valid":  true,
 		"claims": token.Claims,
 	})
+}
+
+func extractStringClaim(claim interface{}) (string, bool) {
+	switch value := claim.(type) {
+	case string:
+		if value == "" {
+			return "", false
+		}
+		return value, true
+	case []string:
+		if len(value) == 0 || value[0] == "" {
+			return "", false
+		}
+		return value[0], true
+	case []interface{}:
+		if len(value) == 0 {
+			return "", false
+		}
+		first, ok := value[0].(string)
+		if !ok || first == "" {
+			return "", false
+		}
+		return first, true
+	default:
+		return "", false
+	}
 }
 
 // GET /api/v1/userinfo
@@ -675,7 +703,7 @@ func (ar *AuthRoutes) UserInfo(c *gin.Context) {
 		return
 	}
 
-	appID, ok := claims["aud"].(string)
+	appID, ok := extractStringClaim(claims["aud"])
 	if !ok || appID == "" {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "missing aud (app_id) claim"})
 		return
@@ -723,7 +751,7 @@ func (ar *AuthRoutes) UserInfo(c *gin.Context) {
 			return nil, fmt.Errorf("unexpected signing method")
 		}
 		return pubKey, nil
-	})
+	}, jwt.WithIssuer("https://auth.yourplatform.com"), jwt.WithAudience(resolvedAppID))
 
 	if err != nil || !verifiedToken.Valid {
 		errMsg := "invalid or expired token"

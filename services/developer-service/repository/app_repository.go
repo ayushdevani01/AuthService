@@ -149,6 +149,16 @@ func (r *AppRepository) RotateAPIKey(ctx context.Context, id string) (string, er
 	return apiKey, nil
 }
 
+func (r *AppRepository) VerifyAPIKey(ctx context.Context, appID, apiKey string) (bool, error) {
+	apiKeyHash := hashAPIKey(apiKey)
+	var count int
+	err := r.db.QueryRow(ctx, `SELECT COUNT(*) FROM apps WHERE app_id = $1 AND api_key_hash = $2`, appID, apiKeyHash).Scan(&count)
+	if err != nil {
+		return false, err
+	}
+	return count > 0, nil
+}
+
 func hashAPIKey(apiKey string) string {
 	hash := sha256.Sum256([]byte(apiKey))
 	return hex.EncodeToString(hash[:])

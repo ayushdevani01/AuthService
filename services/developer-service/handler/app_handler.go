@@ -203,6 +203,19 @@ func (h *AppHandler) DeleteApp(ctx context.Context, req *pb.DeleteAppRequest) (*
 	return &pb.DeleteAppResponse{Success: true}, nil
 }
 
+func (h *AppHandler) VerifyApiKey(ctx context.Context, req *pb.VerifyApiKeyRequest) (*pb.VerifyApiKeyResponse, error) {
+	if req.AppId == "" || req.ApiKey == "" {
+		return nil, status.Error(codes.InvalidArgument, "app_id and api_key are required")
+	}
+
+	valid, err := h.appService.VerifyAPIKey(ctx, req.AppId, req.ApiKey)
+	if err != nil {
+		return nil, status.Error(codes.Internal, "failed to verify api key")
+	}
+
+	return &pb.VerifyApiKeyResponse{Valid: valid}, nil
+}
+
 func (h *AppHandler) RotateApiKey(ctx context.Context, req *pb.RotateApiKeyRequest) (*pb.RotateApiKeyResponse, error) {
 	if req.AppId == "" || req.DeveloperId == "" {
 		return nil, status.Error(codes.InvalidArgument, "app_id and developer_id are required")

@@ -66,6 +66,10 @@ func (h *CombinedHandler) DeleteApp(ctx context.Context, req *pb.DeleteAppReques
 	return h.AppHandler.DeleteApp(ctx, req)
 }
 
+func (h *CombinedHandler) VerifyApiKey(ctx context.Context, req *pb.VerifyApiKeyRequest) (*pb.VerifyApiKeyResponse, error) {
+	return h.AppHandler.VerifyApiKey(ctx, req)
+}
+
 func (h *CombinedHandler) RotateApiKey(ctx context.Context, req *pb.RotateApiKeyRequest) (*pb.RotateApiKeyResponse, error) {
 	return h.AppHandler.RotateApiKey(ctx, req)
 }
