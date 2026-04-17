@@ -31,6 +31,7 @@ const (
 	DeveloperService_UpdateApp_FullMethodName           = "/developer.DeveloperService/UpdateApp"
 	DeveloperService_DeleteApp_FullMethodName           = "/developer.DeveloperService/DeleteApp"
 	DeveloperService_RotateApiKey_FullMethodName        = "/developer.DeveloperService/RotateApiKey"
+	DeveloperService_VerifyApiKey_FullMethodName        = "/developer.DeveloperService/VerifyApiKey"
 	DeveloperService_RotateSigningKeys_FullMethodName   = "/developer.DeveloperService/RotateSigningKeys"
 	DeveloperService_ListSigningKeys_FullMethodName     = "/developer.DeveloperService/ListSigningKeys"
 	DeveloperService_GetActiveSigningKey_FullMethodName = "/developer.DeveloperService/GetActiveSigningKey"
@@ -60,6 +61,7 @@ type DeveloperServiceClient interface {
 	DeleteApp(ctx context.Context, in *DeleteAppRequest, opts ...grpc.CallOption) (*DeleteAppResponse, error)
 	// Key Management
 	RotateApiKey(ctx context.Context, in *RotateApiKeyRequest, opts ...grpc.CallOption) (*RotateApiKeyResponse, error)
+	VerifyApiKey(ctx context.Context, in *VerifyApiKeyRequest, opts ...grpc.CallOption) (*VerifyApiKeyResponse, error)
 	RotateSigningKeys(ctx context.Context, in *RotateSigningKeysRequest, opts ...grpc.CallOption) (*RotateSigningKeysResponse, error)
 	ListSigningKeys(ctx context.Context, in *ListSigningKeysRequest, opts ...grpc.CallOption) (*ListSigningKeysResponse, error)
 	GetActiveSigningKey(ctx context.Context, in *GetActiveSigningKeyRequest, opts ...grpc.CallOption) (*GetActiveSigningKeyResponse, error)
@@ -199,6 +201,16 @@ func (c *developerServiceClient) RotateApiKey(ctx context.Context, in *RotateApi
 	return out, nil
 }
 
+func (c *developerServiceClient) VerifyApiKey(ctx context.Context, in *VerifyApiKeyRequest, opts ...grpc.CallOption) (*VerifyApiKeyResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(VerifyApiKeyResponse)
+	err := c.cc.Invoke(ctx, DeveloperService_VerifyApiKey_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *developerServiceClient) RotateSigningKeys(ctx context.Context, in *RotateSigningKeysRequest, opts ...grpc.CallOption) (*RotateSigningKeysResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(RotateSigningKeysResponse)
@@ -298,6 +310,7 @@ type DeveloperServiceServer interface {
 	DeleteApp(context.Context, *DeleteAppRequest) (*DeleteAppResponse, error)
 	// Key Management
 	RotateApiKey(context.Context, *RotateApiKeyRequest) (*RotateApiKeyResponse, error)
+	VerifyApiKey(context.Context, *VerifyApiKeyRequest) (*VerifyApiKeyResponse, error)
 	RotateSigningKeys(context.Context, *RotateSigningKeysRequest) (*RotateSigningKeysResponse, error)
 	ListSigningKeys(context.Context, *ListSigningKeysRequest) (*ListSigningKeysResponse, error)
 	GetActiveSigningKey(context.Context, *GetActiveSigningKeyRequest) (*GetActiveSigningKeyResponse, error)
@@ -352,6 +365,9 @@ func (UnimplementedDeveloperServiceServer) DeleteApp(context.Context, *DeleteApp
 }
 func (UnimplementedDeveloperServiceServer) RotateApiKey(context.Context, *RotateApiKeyRequest) (*RotateApiKeyResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method RotateApiKey not implemented")
+}
+func (UnimplementedDeveloperServiceServer) VerifyApiKey(context.Context, *VerifyApiKeyRequest) (*VerifyApiKeyResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method VerifyApiKey not implemented")
 }
 func (UnimplementedDeveloperServiceServer) RotateSigningKeys(context.Context, *RotateSigningKeysRequest) (*RotateSigningKeysResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method RotateSigningKeys not implemented")
@@ -614,6 +630,24 @@ func _DeveloperService_RotateApiKey_Handler(srv interface{}, ctx context.Context
 	return interceptor(ctx, in, info, handler)
 }
 
+func _DeveloperService_VerifyApiKey_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(VerifyApiKeyRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(DeveloperServiceServer).VerifyApiKey(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: DeveloperService_VerifyApiKey_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(DeveloperServiceServer).VerifyApiKey(ctx, req.(*VerifyApiKeyRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _DeveloperService_RotateSigningKeys_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(RotateSigningKeysRequest)
 	if err := dec(in); err != nil {
@@ -812,6 +846,10 @@ var DeveloperService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "RotateApiKey",
 			Handler:    _DeveloperService_RotateApiKey_Handler,
+		},
+		{
+			MethodName: "VerifyApiKey",
+			Handler:    _DeveloperService_VerifyApiKey_Handler,
 		},
 		{
 			MethodName: "RotateSigningKeys",
