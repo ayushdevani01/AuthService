@@ -170,6 +170,19 @@ func (dr *DeveloperRoutes) CreateApp(c *gin.Context) {
 		"app":         formatApp(resp.App),
 		"api_key":     resp.ApiKey,
 		"signing_key": formatSigningKey(resp.SigningKey),
+		"integration": gin.H{
+			"public_app_id":      resp.App.AppId,
+			"audience_app_id":    resp.App.Id,
+			"verify_api_key":     resp.ApiKey,
+			"jwks_url":           "/api/v1/apps/" + resp.App.AppId + "/jwks",
+			"verify_endpoint":    "/api/v1/verify",
+			"userinfo_endpoint":  "/api/v1/userinfo",
+			"notes": []string{
+				"Use public_app_id for JWKS lookup and public API headers like x-app-id.",
+				"Use audience_app_id as the expected JWT aud claim value.",
+				"Use verify_api_key when calling the backend verification API.",
+			},
+		},
 	})
 }
 
@@ -475,6 +488,12 @@ func formatApp(a *pb.App) gin.H {
 	return gin.H{
 		"id":            a.Id,
 		"app_id":        a.AppId,
+		"public_app_id": a.AppId,
+		"audience_app_id": a.Id,
+		"identifier_usage": gin.H{
+			"public_app_id":   "Use for JWKS lookup and public API requests.",
+			"audience_app_id": "Use as the expected JWT aud claim value.",
+		},
 		"developer_id":  a.DeveloperId,
 		"name":          a.Name,
 		"logo_url":      a.LogoUrl,

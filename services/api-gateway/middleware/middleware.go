@@ -6,6 +6,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
+	pbDev "github.com/ayushdevan01/AuthService/proto/developer"
 )
 
 func AuthMiddleware(jwtSecret string) gin.HandlerFunc {
@@ -55,6 +56,43 @@ func AuthMiddleware(jwtSecret string) gin.HandlerFunc {
 
 		c.Set("developer_id", developerID)
 		c.Set("email", email)
+		c.Next()
+	}
+}
+
+func ApiKeyMiddleware(devClient pbDev.DeveloperServiceClient) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		apiKey := c.GetHeader("x-api-key")
+		if apiKey == "" {
+			authHeader := c.GetHeader("Authorization")
+			if strings.HasPrefix(authHeader, "Bearer ") {
+				apiKey = strings.TrimPrefix(authHeader, "Bearer ")
+			}
+		}
+
+		if apiKey == "" {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "api key required"})
+			c.Abort()
+			return
+		}
+
+		appID := c.GetHeader("x-app-id")
+		if appID == "" {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "x-app-id header required with api key"})
+			c.Abort()
+			return
+		}
+
+		resp, err := devClient.VerifyApiKey(c.Request.Context(), &pbDev.VerifyApiKeyRequest{
+			AppId:  appID,
+			ApiKey: apiKey,
+		})
+		if err != nil || !resp.Valid {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid api key"})
+			c.Abort()
+			return
+		}
+
 		c.Next()
 	}
 }

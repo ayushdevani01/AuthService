@@ -123,7 +123,7 @@ func main() {
 	api := r.Group("/api/v1")
 	{
 		api.GET("/apps/:app_id/jwks", authRoutes.JWKS)
-		api.POST("/verify", authRoutes.VerifyToken)
+		api.POST("/verify", middleware.ApiKeyMiddleware(devClient), authRoutes.VerifyToken)
 		api.GET("/userinfo", authRoutes.UserInfo)
 	}
 
