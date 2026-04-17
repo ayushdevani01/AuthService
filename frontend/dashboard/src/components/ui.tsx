@@ -1,9 +1,10 @@
 'use client';
 
-import { Check, Loader2, Monitor, Moon, Sun } from 'lucide-react';
+import { Check, Copy, Loader2, Monitor, Moon, Sun } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useThemeStore } from '@/store/theme';
 import type { ReactNode } from 'react';
+import { useState } from 'react';
 
 export function Button({
   children,
@@ -142,6 +143,65 @@ export function ConfirmModal({
           <Button variant="secondary" onClick={onCancel} disabled={loading}>{cancelLabel}</Button>
           <Button onClick={onConfirm} loading={loading}>{confirmLabel}</Button>
         </div>
+      </div>
+    </div>
+  );
+}
+
+export function CodeBlock({ title, code }: { title: string; code: string }) {
+  const [copied, setCopied] = useState(false);
+
+  async function handleCopy() {
+    await navigator.clipboard.writeText(code);
+    setCopied(true);
+    window.setTimeout(() => setCopied(false), 1600);
+  }
+
+  return (
+    <div className="rounded-3xl border border-[var(--border)] bg-[#0a0a0a] p-5 text-sm text-zinc-100">
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <p className="text-xs uppercase tracking-[0.3em] text-zinc-400">{title}</p>
+        <button type="button" onClick={handleCopy} className="inline-flex items-center gap-2 rounded-xl border border-white/10 px-3 py-1.5 text-xs text-zinc-300 transition hover:border-white/20 hover:bg-white/5 hover:text-white">
+          {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+          {copied ? 'Copied' : 'Copy'}
+        </button>
+      </div>
+      <pre className="overflow-x-auto whitespace-pre-wrap font-mono text-[13px] leading-6">{code}</pre>
+    </div>
+  );
+}
+
+export function CodeTabs({
+  tabs,
+  defaultTab,
+}: {
+  tabs: Array<{ key: string; label: string; code: string }>;
+  defaultTab?: string;
+}) {
+  const [activeTab, setActiveTab] = useState(defaultTab || tabs[0]?.key || '');
+  const current = tabs.find((tab) => tab.key === activeTab) || tabs[0];
+
+  if (!current) return null;
+
+  return (
+    <div className="rounded-[1.75rem] border border-[var(--border)] bg-[var(--background-alt)] p-3">
+      <div className="flex flex-wrap gap-2 border-b border-[var(--border)] px-2 pb-3">
+        {tabs.map((tab) => (
+          <button
+            key={tab.key}
+            type="button"
+            onClick={() => setActiveTab(tab.key)}
+            className={cn(
+              'rounded-xl px-3 py-2 text-sm transition',
+              activeTab === tab.key ? 'bg-[var(--accent)] text-[var(--accent-foreground)]' : 'text-muted hover:bg-[var(--panel)] hover:text-foreground',
+            )}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+      <div className="pt-3">
+        <CodeBlock title={current.label} code={current.code} />
       </div>
     </div>
   );

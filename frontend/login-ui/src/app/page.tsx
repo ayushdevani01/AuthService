@@ -11,6 +11,12 @@ import { ForgotPasswordForm } from '@/components/ForgotPasswordForm';
 import { ResetPasswordForm } from '@/components/ResetPasswordForm';
 import { VerifyEmailView } from '@/components/VerifyEmailView';
 
+const trustPoints = [
+  [LockKeyhole, 'Password + OAuth', 'Support email/password, Google, and GitHub from one hosted authentication surface.'],
+  [ShieldCheck, 'Session-ready', 'After success, tokens are returned to your callback route so your app can establish the session immediately.'],
+  [Sparkles, 'Developer-owned', 'Use your own app ID, redirect URI, and provider credentials without rebuilding auth UI for every product.'],
+] as const;
+
 function HostedLoginInner() {
   const { appId, redirectUri, mode, token } = useQueryParams();
   const titleMap = {
@@ -29,10 +35,10 @@ function HostedLoginInner() {
             <p className="text-xs uppercase tracking-[0.45em]" style={{ color: 'var(--muted)' }}>Hosted Login</p>
             <ThemeToggle />
           </div>
-          <h1 className="mt-6 text-5xl font-semibold leading-tight" style={{ color: 'var(--foreground)' }}>Monochrome identity, crafted with deliberate contrast.</h1>
-          <p className="mt-6 max-w-xl text-base" style={{ color: 'var(--muted)' }}>A deeply black authentication surface for premium products with a full light-mode counterpart. Every panel, stroke, and interaction stays disciplined and highly legible.</p>
+          <h1 className="mt-6 text-5xl font-semibold leading-tight" style={{ color: 'var(--foreground)' }}>Hosted authentication for your app, ready to plug in.</h1>
+          <p className="mt-6 max-w-xl text-base" style={{ color: 'var(--muted)' }}>Use this page to handle sign in, registration, password reset, and email verification with AuthService. Connect your app ID, redirect URI, and provider credentials, then send users here when they need to authenticate.</p>
           <div className="mt-10 grid gap-4 md:grid-cols-3">
-            {[[LockKeyhole, 'Secure', 'Password and OAuth under one interface.'], [ShieldCheck, 'Verified', 'Email verification and recovery flows included.'], [Sparkles, 'Minimal', 'No loud colors, only controlled luxury.']].map(([Icon, title, copy]) => {
+            {trustPoints.map(([Icon, title, copy]) => {
               const RenderIcon = Icon as typeof LockKeyhole;
               return <div key={title as string} className="rounded-[1.2rem] border p-5" style={{ borderColor: 'var(--border)', background: 'var(--background-alt)' }}><RenderIcon className="h-5 w-5" style={{ color: 'var(--foreground)' }} /><p className="mt-4 text-sm font-medium" style={{ color: 'var(--foreground)' }}>{title as string}</p><p className="mt-2 text-sm leading-6" style={{ color: 'var(--muted)' }}>{copy as string}</p></div>;
             })}

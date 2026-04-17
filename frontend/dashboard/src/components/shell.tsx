@@ -12,9 +12,9 @@ import type { ReactNode } from 'react';
 
 const links = [
   { href: '/dashboard', label: 'Applications', icon: Layers3 },
+  { href: '/dashboard/docs', label: 'Documentation', icon: BookOpenText },
   { href: '/dashboard/profile', label: 'Profile', icon: Shield },
   { href: '/', label: 'Marketing', icon: Compass },
-  { href: '/#docs', label: 'Docs', icon: BookOpenText },
 ];
 
 export function DashboardShell({ children }: { children: ReactNode }) {
