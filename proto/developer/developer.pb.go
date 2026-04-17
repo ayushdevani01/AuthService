@@ -1552,6 +1552,102 @@ func (x *RotateApiKeyResponse) GetNewApiKey() string {
 	return ""
 }
 
+type VerifyApiKeyRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	AppId         string                 `protobuf:"bytes,1,opt,name=app_id,json=appId,proto3" json:"app_id,omitempty"`
+	ApiKey        string                 `protobuf:"bytes,2,opt,name=api_key,json=apiKey,proto3" json:"api_key,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *VerifyApiKeyRequest) Reset() {
+	*x = VerifyApiKeyRequest{}
+	mi := &file_proto_developer_developer_proto_msgTypes[27]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *VerifyApiKeyRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*VerifyApiKeyRequest) ProtoMessage() {}
+
+func (x *VerifyApiKeyRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_developer_developer_proto_msgTypes[27]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use VerifyApiKeyRequest.ProtoReflect.Descriptor instead.
+func (*VerifyApiKeyRequest) Descriptor() ([]byte, []int) {
+	return file_proto_developer_developer_proto_rawDescGZIP(), []int{27}
+}
+
+func (x *VerifyApiKeyRequest) GetAppId() string {
+	if x != nil {
+		return x.AppId
+	}
+	return ""
+}
+
+func (x *VerifyApiKeyRequest) GetApiKey() string {
+	if x != nil {
+		return x.ApiKey
+	}
+	return ""
+}
+
+type VerifyApiKeyResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Valid         bool                   `protobuf:"varint,1,opt,name=valid,proto3" json:"valid,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *VerifyApiKeyResponse) Reset() {
+	*x = VerifyApiKeyResponse{}
+	mi := &file_proto_developer_developer_proto_msgTypes[28]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *VerifyApiKeyResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*VerifyApiKeyResponse) ProtoMessage() {}
+
+func (x *VerifyApiKeyResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_developer_developer_proto_msgTypes[28]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use VerifyApiKeyResponse.ProtoReflect.Descriptor instead.
+func (*VerifyApiKeyResponse) Descriptor() ([]byte, []int) {
+	return file_proto_developer_developer_proto_rawDescGZIP(), []int{28}
+}
+
+func (x *VerifyApiKeyResponse) GetValid() bool {
+	if x != nil {
+		return x.Valid
+	}
+	return false
+}
+
 type RotateSigningKeysRequest struct {
 	state            protoimpl.MessageState `protogen:"open.v1"`
 	AppId            string                 `protobuf:"bytes,1,opt,name=app_id,json=appId,proto3" json:"app_id,omitempty"`
@@ -1563,7 +1659,7 @@ type RotateSigningKeysRequest struct {
 
 func (x *RotateSigningKeysRequest) Reset() {
 	*x = RotateSigningKeysRequest{}
-	mi := &file_proto_developer_developer_proto_msgTypes[27]
+	mi := &file_proto_developer_developer_proto_msgTypes[29]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1575,7 +1671,7 @@ func (x *RotateSigningKeysRequest) String() string {
 func (*RotateSigningKeysRequest) ProtoMessage() {}
 
 func (x *RotateSigningKeysRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_developer_developer_proto_msgTypes[27]
+	mi := &file_proto_developer_developer_proto_msgTypes[29]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1588,7 +1684,7 @@ func (x *RotateSigningKeysRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RotateSigningKeysRequest.ProtoReflect.Descriptor instead.
 func (*RotateSigningKeysRequest) Descriptor() ([]byte, []int) {
-	return file_proto_developer_developer_proto_rawDescGZIP(), []int{27}
+	return file_proto_developer_developer_proto_rawDescGZIP(), []int{29}
 }
 
 func (x *RotateSigningKeysRequest) GetAppId() string {
@@ -1622,7 +1718,7 @@ type RotateSigningKeysResponse struct {
 
 func (x *RotateSigningKeysResponse) Reset() {
 	*x = RotateSigningKeysResponse{}
-	mi := &file_proto_developer_developer_proto_msgTypes[28]
+	mi := &file_proto_developer_developer_proto_msgTypes[30]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1634,7 +1730,7 @@ func (x *RotateSigningKeysResponse) String() string {
 func (*RotateSigningKeysResponse) ProtoMessage() {}
 
 func (x *RotateSigningKeysResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_developer_developer_proto_msgTypes[28]
+	mi := &file_proto_developer_developer_proto_msgTypes[30]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1647,7 +1743,7 @@ func (x *RotateSigningKeysResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RotateSigningKeysResponse.ProtoReflect.Descriptor instead.
 func (*RotateSigningKeysResponse) Descriptor() ([]byte, []int) {
-	return file_proto_developer_developer_proto_rawDescGZIP(), []int{28}
+	return file_proto_developer_developer_proto_rawDescGZIP(), []int{30}
 }
 
 func (x *RotateSigningKeysResponse) GetNewKey() *SigningKey {
@@ -1675,7 +1771,7 @@ type ListSigningKeysRequest struct {
 
 func (x *ListSigningKeysRequest) Reset() {
 	*x = ListSigningKeysRequest{}
-	mi := &file_proto_developer_developer_proto_msgTypes[29]
+	mi := &file_proto_developer_developer_proto_msgTypes[31]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1687,7 +1783,7 @@ func (x *ListSigningKeysRequest) String() string {
 func (*ListSigningKeysRequest) ProtoMessage() {}
 
 func (x *ListSigningKeysRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_developer_developer_proto_msgTypes[29]
+	mi := &file_proto_developer_developer_proto_msgTypes[31]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1700,7 +1796,7 @@ func (x *ListSigningKeysRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListSigningKeysRequest.ProtoReflect.Descriptor instead.
 func (*ListSigningKeysRequest) Descriptor() ([]byte, []int) {
-	return file_proto_developer_developer_proto_rawDescGZIP(), []int{29}
+	return file_proto_developer_developer_proto_rawDescGZIP(), []int{31}
 }
 
 func (x *ListSigningKeysRequest) GetAppId() string {
@@ -1733,7 +1829,7 @@ type ListSigningKeysResponse struct {
 
 func (x *ListSigningKeysResponse) Reset() {
 	*x = ListSigningKeysResponse{}
-	mi := &file_proto_developer_developer_proto_msgTypes[30]
+	mi := &file_proto_developer_developer_proto_msgTypes[32]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1745,7 +1841,7 @@ func (x *ListSigningKeysResponse) String() string {
 func (*ListSigningKeysResponse) ProtoMessage() {}
 
 func (x *ListSigningKeysResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_developer_developer_proto_msgTypes[30]
+	mi := &file_proto_developer_developer_proto_msgTypes[32]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1758,7 +1854,7 @@ func (x *ListSigningKeysResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListSigningKeysResponse.ProtoReflect.Descriptor instead.
 func (*ListSigningKeysResponse) Descriptor() ([]byte, []int) {
-	return file_proto_developer_developer_proto_rawDescGZIP(), []int{30}
+	return file_proto_developer_developer_proto_rawDescGZIP(), []int{32}
 }
 
 func (x *ListSigningKeysResponse) GetKeys() []*SigningKey {
@@ -1777,7 +1873,7 @@ type GetActiveSigningKeyRequest struct {
 
 func (x *GetActiveSigningKeyRequest) Reset() {
 	*x = GetActiveSigningKeyRequest{}
-	mi := &file_proto_developer_developer_proto_msgTypes[31]
+	mi := &file_proto_developer_developer_proto_msgTypes[33]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1789,7 +1885,7 @@ func (x *GetActiveSigningKeyRequest) String() string {
 func (*GetActiveSigningKeyRequest) ProtoMessage() {}
 
 func (x *GetActiveSigningKeyRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_developer_developer_proto_msgTypes[31]
+	mi := &file_proto_developer_developer_proto_msgTypes[33]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1802,7 +1898,7 @@ func (x *GetActiveSigningKeyRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetActiveSigningKeyRequest.ProtoReflect.Descriptor instead.
 func (*GetActiveSigningKeyRequest) Descriptor() ([]byte, []int) {
-	return file_proto_developer_developer_proto_rawDescGZIP(), []int{31}
+	return file_proto_developer_developer_proto_rawDescGZIP(), []int{33}
 }
 
 func (x *GetActiveSigningKeyRequest) GetAppId() string {
@@ -1823,7 +1919,7 @@ type GetActiveSigningKeyResponse struct {
 
 func (x *GetActiveSigningKeyResponse) Reset() {
 	*x = GetActiveSigningKeyResponse{}
-	mi := &file_proto_developer_developer_proto_msgTypes[32]
+	mi := &file_proto_developer_developer_proto_msgTypes[34]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1835,7 +1931,7 @@ func (x *GetActiveSigningKeyResponse) String() string {
 func (*GetActiveSigningKeyResponse) ProtoMessage() {}
 
 func (x *GetActiveSigningKeyResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_developer_developer_proto_msgTypes[32]
+	mi := &file_proto_developer_developer_proto_msgTypes[34]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1848,7 +1944,7 @@ func (x *GetActiveSigningKeyResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetActiveSigningKeyResponse.ProtoReflect.Descriptor instead.
 func (*GetActiveSigningKeyResponse) Descriptor() ([]byte, []int) {
-	return file_proto_developer_developer_proto_rawDescGZIP(), []int{32}
+	return file_proto_developer_developer_proto_rawDescGZIP(), []int{34}
 }
 
 func (x *GetActiveSigningKeyResponse) GetKey() *SigningKey {
@@ -1888,7 +1984,7 @@ type OAuthProvider struct {
 
 func (x *OAuthProvider) Reset() {
 	*x = OAuthProvider{}
-	mi := &file_proto_developer_developer_proto_msgTypes[33]
+	mi := &file_proto_developer_developer_proto_msgTypes[35]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1900,7 +1996,7 @@ func (x *OAuthProvider) String() string {
 func (*OAuthProvider) ProtoMessage() {}
 
 func (x *OAuthProvider) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_developer_developer_proto_msgTypes[33]
+	mi := &file_proto_developer_developer_proto_msgTypes[35]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1913,7 +2009,7 @@ func (x *OAuthProvider) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use OAuthProvider.ProtoReflect.Descriptor instead.
 func (*OAuthProvider) Descriptor() ([]byte, []int) {
-	return file_proto_developer_developer_proto_rawDescGZIP(), []int{33}
+	return file_proto_developer_developer_proto_rawDescGZIP(), []int{35}
 }
 
 func (x *OAuthProvider) GetId() string {
@@ -1980,7 +2076,7 @@ type AddOAuthProviderRequest struct {
 
 func (x *AddOAuthProviderRequest) Reset() {
 	*x = AddOAuthProviderRequest{}
-	mi := &file_proto_developer_developer_proto_msgTypes[34]
+	mi := &file_proto_developer_developer_proto_msgTypes[36]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1992,7 +2088,7 @@ func (x *AddOAuthProviderRequest) String() string {
 func (*AddOAuthProviderRequest) ProtoMessage() {}
 
 func (x *AddOAuthProviderRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_developer_developer_proto_msgTypes[34]
+	mi := &file_proto_developer_developer_proto_msgTypes[36]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2005,7 +2101,7 @@ func (x *AddOAuthProviderRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AddOAuthProviderRequest.ProtoReflect.Descriptor instead.
 func (*AddOAuthProviderRequest) Descriptor() ([]byte, []int) {
-	return file_proto_developer_developer_proto_rawDescGZIP(), []int{34}
+	return file_proto_developer_developer_proto_rawDescGZIP(), []int{36}
 }
 
 func (x *AddOAuthProviderRequest) GetAppId() string {
@@ -2059,7 +2155,7 @@ type AddOAuthProviderResponse struct {
 
 func (x *AddOAuthProviderResponse) Reset() {
 	*x = AddOAuthProviderResponse{}
-	mi := &file_proto_developer_developer_proto_msgTypes[35]
+	mi := &file_proto_developer_developer_proto_msgTypes[37]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2071,7 +2167,7 @@ func (x *AddOAuthProviderResponse) String() string {
 func (*AddOAuthProviderResponse) ProtoMessage() {}
 
 func (x *AddOAuthProviderResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_developer_developer_proto_msgTypes[35]
+	mi := &file_proto_developer_developer_proto_msgTypes[37]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2084,7 +2180,7 @@ func (x *AddOAuthProviderResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AddOAuthProviderResponse.ProtoReflect.Descriptor instead.
 func (*AddOAuthProviderResponse) Descriptor() ([]byte, []int) {
-	return file_proto_developer_developer_proto_rawDescGZIP(), []int{35}
+	return file_proto_developer_developer_proto_rawDescGZIP(), []int{37}
 }
 
 func (x *AddOAuthProviderResponse) GetProvider() *OAuthProvider {
@@ -2104,7 +2200,7 @@ type GetOAuthProviderRequest struct {
 
 func (x *GetOAuthProviderRequest) Reset() {
 	*x = GetOAuthProviderRequest{}
-	mi := &file_proto_developer_developer_proto_msgTypes[36]
+	mi := &file_proto_developer_developer_proto_msgTypes[38]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2116,7 +2212,7 @@ func (x *GetOAuthProviderRequest) String() string {
 func (*GetOAuthProviderRequest) ProtoMessage() {}
 
 func (x *GetOAuthProviderRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_developer_developer_proto_msgTypes[36]
+	mi := &file_proto_developer_developer_proto_msgTypes[38]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2129,7 +2225,7 @@ func (x *GetOAuthProviderRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetOAuthProviderRequest.ProtoReflect.Descriptor instead.
 func (*GetOAuthProviderRequest) Descriptor() ([]byte, []int) {
-	return file_proto_developer_developer_proto_rawDescGZIP(), []int{36}
+	return file_proto_developer_developer_proto_rawDescGZIP(), []int{38}
 }
 
 func (x *GetOAuthProviderRequest) GetAppId() string {
@@ -2157,7 +2253,7 @@ type GetOAuthProviderResponse struct {
 
 func (x *GetOAuthProviderResponse) Reset() {
 	*x = GetOAuthProviderResponse{}
-	mi := &file_proto_developer_developer_proto_msgTypes[37]
+	mi := &file_proto_developer_developer_proto_msgTypes[39]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2169,7 +2265,7 @@ func (x *GetOAuthProviderResponse) String() string {
 func (*GetOAuthProviderResponse) ProtoMessage() {}
 
 func (x *GetOAuthProviderResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_developer_developer_proto_msgTypes[37]
+	mi := &file_proto_developer_developer_proto_msgTypes[39]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2182,7 +2278,7 @@ func (x *GetOAuthProviderResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetOAuthProviderResponse.ProtoReflect.Descriptor instead.
 func (*GetOAuthProviderResponse) Descriptor() ([]byte, []int) {
-	return file_proto_developer_developer_proto_rawDescGZIP(), []int{37}
+	return file_proto_developer_developer_proto_rawDescGZIP(), []int{39}
 }
 
 func (x *GetOAuthProviderResponse) GetProvider() *OAuthProvider {
@@ -2216,7 +2312,7 @@ type ListOAuthProvidersRequest struct {
 
 func (x *ListOAuthProvidersRequest) Reset() {
 	*x = ListOAuthProvidersRequest{}
-	mi := &file_proto_developer_developer_proto_msgTypes[38]
+	mi := &file_proto_developer_developer_proto_msgTypes[40]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2228,7 +2324,7 @@ func (x *ListOAuthProvidersRequest) String() string {
 func (*ListOAuthProvidersRequest) ProtoMessage() {}
 
 func (x *ListOAuthProvidersRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_developer_developer_proto_msgTypes[38]
+	mi := &file_proto_developer_developer_proto_msgTypes[40]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2241,7 +2337,7 @@ func (x *ListOAuthProvidersRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListOAuthProvidersRequest.ProtoReflect.Descriptor instead.
 func (*ListOAuthProvidersRequest) Descriptor() ([]byte, []int) {
-	return file_proto_developer_developer_proto_rawDescGZIP(), []int{38}
+	return file_proto_developer_developer_proto_rawDescGZIP(), []int{40}
 }
 
 func (x *ListOAuthProvidersRequest) GetAppId() string {
@@ -2267,7 +2363,7 @@ type ListOAuthProvidersResponse struct {
 
 func (x *ListOAuthProvidersResponse) Reset() {
 	*x = ListOAuthProvidersResponse{}
-	mi := &file_proto_developer_developer_proto_msgTypes[39]
+	mi := &file_proto_developer_developer_proto_msgTypes[41]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2279,7 +2375,7 @@ func (x *ListOAuthProvidersResponse) String() string {
 func (*ListOAuthProvidersResponse) ProtoMessage() {}
 
 func (x *ListOAuthProvidersResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_developer_developer_proto_msgTypes[39]
+	mi := &file_proto_developer_developer_proto_msgTypes[41]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2292,7 +2388,7 @@ func (x *ListOAuthProvidersResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListOAuthProvidersResponse.ProtoReflect.Descriptor instead.
 func (*ListOAuthProvidersResponse) Descriptor() ([]byte, []int) {
-	return file_proto_developer_developer_proto_rawDescGZIP(), []int{39}
+	return file_proto_developer_developer_proto_rawDescGZIP(), []int{41}
 }
 
 func (x *ListOAuthProvidersResponse) GetProviders() []*OAuthProvider {
@@ -2317,7 +2413,7 @@ type UpdateOAuthProviderRequest struct {
 
 func (x *UpdateOAuthProviderRequest) Reset() {
 	*x = UpdateOAuthProviderRequest{}
-	mi := &file_proto_developer_developer_proto_msgTypes[40]
+	mi := &file_proto_developer_developer_proto_msgTypes[42]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2329,7 +2425,7 @@ func (x *UpdateOAuthProviderRequest) String() string {
 func (*UpdateOAuthProviderRequest) ProtoMessage() {}
 
 func (x *UpdateOAuthProviderRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_developer_developer_proto_msgTypes[40]
+	mi := &file_proto_developer_developer_proto_msgTypes[42]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2342,7 +2438,7 @@ func (x *UpdateOAuthProviderRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateOAuthProviderRequest.ProtoReflect.Descriptor instead.
 func (*UpdateOAuthProviderRequest) Descriptor() ([]byte, []int) {
-	return file_proto_developer_developer_proto_rawDescGZIP(), []int{40}
+	return file_proto_developer_developer_proto_rawDescGZIP(), []int{42}
 }
 
 func (x *UpdateOAuthProviderRequest) GetAppId() string {
@@ -2403,7 +2499,7 @@ type UpdateOAuthProviderResponse struct {
 
 func (x *UpdateOAuthProviderResponse) Reset() {
 	*x = UpdateOAuthProviderResponse{}
-	mi := &file_proto_developer_developer_proto_msgTypes[41]
+	mi := &file_proto_developer_developer_proto_msgTypes[43]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2415,7 +2511,7 @@ func (x *UpdateOAuthProviderResponse) String() string {
 func (*UpdateOAuthProviderResponse) ProtoMessage() {}
 
 func (x *UpdateOAuthProviderResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_developer_developer_proto_msgTypes[41]
+	mi := &file_proto_developer_developer_proto_msgTypes[43]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2428,7 +2524,7 @@ func (x *UpdateOAuthProviderResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateOAuthProviderResponse.ProtoReflect.Descriptor instead.
 func (*UpdateOAuthProviderResponse) Descriptor() ([]byte, []int) {
-	return file_proto_developer_developer_proto_rawDescGZIP(), []int{41}
+	return file_proto_developer_developer_proto_rawDescGZIP(), []int{43}
 }
 
 func (x *UpdateOAuthProviderResponse) GetProvider() *OAuthProvider {
@@ -2449,7 +2545,7 @@ type DeleteOAuthProviderRequest struct {
 
 func (x *DeleteOAuthProviderRequest) Reset() {
 	*x = DeleteOAuthProviderRequest{}
-	mi := &file_proto_developer_developer_proto_msgTypes[42]
+	mi := &file_proto_developer_developer_proto_msgTypes[44]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2461,7 +2557,7 @@ func (x *DeleteOAuthProviderRequest) String() string {
 func (*DeleteOAuthProviderRequest) ProtoMessage() {}
 
 func (x *DeleteOAuthProviderRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_developer_developer_proto_msgTypes[42]
+	mi := &file_proto_developer_developer_proto_msgTypes[44]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2474,7 +2570,7 @@ func (x *DeleteOAuthProviderRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteOAuthProviderRequest.ProtoReflect.Descriptor instead.
 func (*DeleteOAuthProviderRequest) Descriptor() ([]byte, []int) {
-	return file_proto_developer_developer_proto_rawDescGZIP(), []int{42}
+	return file_proto_developer_developer_proto_rawDescGZIP(), []int{44}
 }
 
 func (x *DeleteOAuthProviderRequest) GetAppId() string {
@@ -2507,7 +2603,7 @@ type DeleteOAuthProviderResponse struct {
 
 func (x *DeleteOAuthProviderResponse) Reset() {
 	*x = DeleteOAuthProviderResponse{}
-	mi := &file_proto_developer_developer_proto_msgTypes[43]
+	mi := &file_proto_developer_developer_proto_msgTypes[45]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2519,7 +2615,7 @@ func (x *DeleteOAuthProviderResponse) String() string {
 func (*DeleteOAuthProviderResponse) ProtoMessage() {}
 
 func (x *DeleteOAuthProviderResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_developer_developer_proto_msgTypes[43]
+	mi := &file_proto_developer_developer_proto_msgTypes[45]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2532,7 +2628,7 @@ func (x *DeleteOAuthProviderResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteOAuthProviderResponse.ProtoReflect.Descriptor instead.
 func (*DeleteOAuthProviderResponse) Descriptor() ([]byte, []int) {
-	return file_proto_developer_developer_proto_rawDescGZIP(), []int{43}
+	return file_proto_developer_developer_proto_rawDescGZIP(), []int{45}
 }
 
 func (x *DeleteOAuthProviderResponse) GetSuccess() bool {
@@ -2657,7 +2753,12 @@ const file_proto_developer_developer_proto_rawDesc = "" +
 	"\x06app_id\x18\x01 \x01(\tR\x05appId\x12!\n" +
 	"\fdeveloper_id\x18\x02 \x01(\tR\vdeveloperId\"6\n" +
 	"\x14RotateApiKeyResponse\x12\x1e\n" +
-	"\vnew_api_key\x18\x01 \x01(\tR\tnewApiKey\"\x82\x01\n" +
+	"\vnew_api_key\x18\x01 \x01(\tR\tnewApiKey\"E\n" +
+	"\x13VerifyApiKeyRequest\x12\x15\n" +
+	"\x06app_id\x18\x01 \x01(\tR\x05appId\x12\x17\n" +
+	"\aapi_key\x18\x02 \x01(\tR\x06apiKey\",\n" +
+	"\x14VerifyApiKeyResponse\x12\x14\n" +
+	"\x05valid\x18\x01 \x01(\bR\x05valid\"\x82\x01\n" +
 	"\x18RotateSigningKeysRequest\x12\x15\n" +
 	"\x06app_id\x18\x01 \x01(\tR\x05appId\x12!\n" +
 	"\fdeveloper_id\x18\x02 \x01(\tR\vdeveloperId\x12,\n" +
@@ -2728,7 +2829,7 @@ const file_proto_developer_developer_proto_rawDesc = "" +
 	"\fdeveloper_id\x18\x02 \x01(\tR\vdeveloperId\x12\x1a\n" +
 	"\bprovider\x18\x03 \x01(\tR\bprovider\"7\n" +
 	"\x1bDeleteOAuthProviderResponse\x12\x18\n" +
-	"\asuccess\x18\x01 \x01(\bR\asuccess2\xf8\f\n" +
+	"\asuccess\x18\x01 \x01(\bR\asuccess2\xc9\r\n" +
 	"\x10DeveloperService\x12C\n" +
 	"\bRegister\x12\x1a.developer.RegisterRequest\x1a\x1b.developer.RegisterResponse\x12:\n" +
 	"\x05Login\x12\x17.developer.LoginRequest\x1a\x18.developer.LoginResponse\x12=\n" +
@@ -2742,7 +2843,8 @@ const file_proto_developer_developer_proto_rawDesc = "" +
 	"\bListApps\x12\x1a.developer.ListAppsRequest\x1a\x1b.developer.ListAppsResponse\x12F\n" +
 	"\tUpdateApp\x12\x1b.developer.UpdateAppRequest\x1a\x1c.developer.UpdateAppResponse\x12F\n" +
 	"\tDeleteApp\x12\x1b.developer.DeleteAppRequest\x1a\x1c.developer.DeleteAppResponse\x12O\n" +
-	"\fRotateApiKey\x12\x1e.developer.RotateApiKeyRequest\x1a\x1f.developer.RotateApiKeyResponse\x12^\n" +
+	"\fRotateApiKey\x12\x1e.developer.RotateApiKeyRequest\x1a\x1f.developer.RotateApiKeyResponse\x12O\n" +
+	"\fVerifyApiKey\x12\x1e.developer.VerifyApiKeyRequest\x1a\x1f.developer.VerifyApiKeyResponse\x12^\n" +
 	"\x11RotateSigningKeys\x12#.developer.RotateSigningKeysRequest\x1a$.developer.RotateSigningKeysResponse\x12X\n" +
 	"\x0fListSigningKeys\x12!.developer.ListSigningKeysRequest\x1a\".developer.ListSigningKeysResponse\x12d\n" +
 	"\x13GetActiveSigningKey\x12%.developer.GetActiveSigningKeyRequest\x1a&.developer.GetActiveSigningKeyResponse\x12[\n" +
@@ -2764,7 +2866,7 @@ func file_proto_developer_developer_proto_rawDescGZIP() []byte {
 	return file_proto_developer_developer_proto_rawDescData
 }
 
-var file_proto_developer_developer_proto_msgTypes = make([]protoimpl.MessageInfo, 44)
+var file_proto_developer_developer_proto_msgTypes = make([]protoimpl.MessageInfo, 46)
 var file_proto_developer_developer_proto_goTypes = []any{
 	(*Developer)(nil),                   // 0: developer.Developer
 	(*RegisterRequest)(nil),             // 1: developer.RegisterRequest
@@ -2793,52 +2895,54 @@ var file_proto_developer_developer_proto_goTypes = []any{
 	(*SigningKey)(nil),                  // 24: developer.SigningKey
 	(*RotateApiKeyRequest)(nil),         // 25: developer.RotateApiKeyRequest
 	(*RotateApiKeyResponse)(nil),        // 26: developer.RotateApiKeyResponse
-	(*RotateSigningKeysRequest)(nil),    // 27: developer.RotateSigningKeysRequest
-	(*RotateSigningKeysResponse)(nil),   // 28: developer.RotateSigningKeysResponse
-	(*ListSigningKeysRequest)(nil),      // 29: developer.ListSigningKeysRequest
-	(*ListSigningKeysResponse)(nil),     // 30: developer.ListSigningKeysResponse
-	(*GetActiveSigningKeyRequest)(nil),  // 31: developer.GetActiveSigningKeyRequest
-	(*GetActiveSigningKeyResponse)(nil), // 32: developer.GetActiveSigningKeyResponse
-	(*OAuthProvider)(nil),               // 33: developer.OAuthProvider
-	(*AddOAuthProviderRequest)(nil),     // 34: developer.AddOAuthProviderRequest
-	(*AddOAuthProviderResponse)(nil),    // 35: developer.AddOAuthProviderResponse
-	(*GetOAuthProviderRequest)(nil),     // 36: developer.GetOAuthProviderRequest
-	(*GetOAuthProviderResponse)(nil),    // 37: developer.GetOAuthProviderResponse
-	(*ListOAuthProvidersRequest)(nil),   // 38: developer.ListOAuthProvidersRequest
-	(*ListOAuthProvidersResponse)(nil),  // 39: developer.ListOAuthProvidersResponse
-	(*UpdateOAuthProviderRequest)(nil),  // 40: developer.UpdateOAuthProviderRequest
-	(*UpdateOAuthProviderResponse)(nil), // 41: developer.UpdateOAuthProviderResponse
-	(*DeleteOAuthProviderRequest)(nil),  // 42: developer.DeleteOAuthProviderRequest
-	(*DeleteOAuthProviderResponse)(nil), // 43: developer.DeleteOAuthProviderResponse
-	(*timestamppb.Timestamp)(nil),       // 44: google.protobuf.Timestamp
+	(*VerifyApiKeyRequest)(nil),         // 27: developer.VerifyApiKeyRequest
+	(*VerifyApiKeyResponse)(nil),        // 28: developer.VerifyApiKeyResponse
+	(*RotateSigningKeysRequest)(nil),    // 29: developer.RotateSigningKeysRequest
+	(*RotateSigningKeysResponse)(nil),   // 30: developer.RotateSigningKeysResponse
+	(*ListSigningKeysRequest)(nil),      // 31: developer.ListSigningKeysRequest
+	(*ListSigningKeysResponse)(nil),     // 32: developer.ListSigningKeysResponse
+	(*GetActiveSigningKeyRequest)(nil),  // 33: developer.GetActiveSigningKeyRequest
+	(*GetActiveSigningKeyResponse)(nil), // 34: developer.GetActiveSigningKeyResponse
+	(*OAuthProvider)(nil),               // 35: developer.OAuthProvider
+	(*AddOAuthProviderRequest)(nil),     // 36: developer.AddOAuthProviderRequest
+	(*AddOAuthProviderResponse)(nil),    // 37: developer.AddOAuthProviderResponse
+	(*GetOAuthProviderRequest)(nil),     // 38: developer.GetOAuthProviderRequest
+	(*GetOAuthProviderResponse)(nil),    // 39: developer.GetOAuthProviderResponse
+	(*ListOAuthProvidersRequest)(nil),   // 40: developer.ListOAuthProvidersRequest
+	(*ListOAuthProvidersResponse)(nil),  // 41: developer.ListOAuthProvidersResponse
+	(*UpdateOAuthProviderRequest)(nil),  // 42: developer.UpdateOAuthProviderRequest
+	(*UpdateOAuthProviderResponse)(nil), // 43: developer.UpdateOAuthProviderResponse
+	(*DeleteOAuthProviderRequest)(nil),  // 44: developer.DeleteOAuthProviderRequest
+	(*DeleteOAuthProviderResponse)(nil), // 45: developer.DeleteOAuthProviderResponse
+	(*timestamppb.Timestamp)(nil),       // 46: google.protobuf.Timestamp
 }
 var file_proto_developer_developer_proto_depIdxs = []int32{
-	44, // 0: developer.Developer.created_at:type_name -> google.protobuf.Timestamp
-	44, // 1: developer.Developer.updated_at:type_name -> google.protobuf.Timestamp
+	46, // 0: developer.Developer.created_at:type_name -> google.protobuf.Timestamp
+	46, // 1: developer.Developer.updated_at:type_name -> google.protobuf.Timestamp
 	0,  // 2: developer.RegisterResponse.developer:type_name -> developer.Developer
 	0,  // 3: developer.LoginResponse.developer:type_name -> developer.Developer
 	0,  // 4: developer.GetProfileResponse.developer:type_name -> developer.Developer
 	0,  // 5: developer.UpdateProfileResponse.developer:type_name -> developer.Developer
-	44, // 6: developer.App.created_at:type_name -> google.protobuf.Timestamp
-	44, // 7: developer.App.updated_at:type_name -> google.protobuf.Timestamp
+	46, // 6: developer.App.created_at:type_name -> google.protobuf.Timestamp
+	46, // 7: developer.App.updated_at:type_name -> google.protobuf.Timestamp
 	11, // 8: developer.CreateAppResponse.app:type_name -> developer.App
 	24, // 9: developer.CreateAppResponse.signing_key:type_name -> developer.SigningKey
 	11, // 10: developer.GetAppResponse.app:type_name -> developer.App
 	11, // 11: developer.GetPublicAppResponse.app:type_name -> developer.App
 	11, // 12: developer.ListAppsResponse.apps:type_name -> developer.App
 	11, // 13: developer.UpdateAppResponse.app:type_name -> developer.App
-	44, // 14: developer.SigningKey.created_at:type_name -> google.protobuf.Timestamp
-	44, // 15: developer.SigningKey.expires_at:type_name -> google.protobuf.Timestamp
-	44, // 16: developer.SigningKey.rotated_at:type_name -> google.protobuf.Timestamp
+	46, // 14: developer.SigningKey.created_at:type_name -> google.protobuf.Timestamp
+	46, // 15: developer.SigningKey.expires_at:type_name -> google.protobuf.Timestamp
+	46, // 16: developer.SigningKey.rotated_at:type_name -> google.protobuf.Timestamp
 	24, // 17: developer.RotateSigningKeysResponse.new_key:type_name -> developer.SigningKey
 	24, // 18: developer.RotateSigningKeysResponse.old_key:type_name -> developer.SigningKey
 	24, // 19: developer.ListSigningKeysResponse.keys:type_name -> developer.SigningKey
 	24, // 20: developer.GetActiveSigningKeyResponse.key:type_name -> developer.SigningKey
-	44, // 21: developer.OAuthProvider.created_at:type_name -> google.protobuf.Timestamp
-	33, // 22: developer.AddOAuthProviderResponse.provider:type_name -> developer.OAuthProvider
-	33, // 23: developer.GetOAuthProviderResponse.provider:type_name -> developer.OAuthProvider
-	33, // 24: developer.ListOAuthProvidersResponse.providers:type_name -> developer.OAuthProvider
-	33, // 25: developer.UpdateOAuthProviderResponse.provider:type_name -> developer.OAuthProvider
+	46, // 21: developer.OAuthProvider.created_at:type_name -> google.protobuf.Timestamp
+	35, // 22: developer.AddOAuthProviderResponse.provider:type_name -> developer.OAuthProvider
+	35, // 23: developer.GetOAuthProviderResponse.provider:type_name -> developer.OAuthProvider
+	35, // 24: developer.ListOAuthProvidersResponse.providers:type_name -> developer.OAuthProvider
+	35, // 25: developer.UpdateOAuthProviderResponse.provider:type_name -> developer.OAuthProvider
 	1,  // 26: developer.DeveloperService.Register:input_type -> developer.RegisterRequest
 	3,  // 27: developer.DeveloperService.Login:input_type -> developer.LoginRequest
 	5,  // 28: developer.DeveloperService.Logout:input_type -> developer.LogoutRequest
@@ -2851,36 +2955,38 @@ var file_proto_developer_developer_proto_depIdxs = []int32{
 	20, // 35: developer.DeveloperService.UpdateApp:input_type -> developer.UpdateAppRequest
 	22, // 36: developer.DeveloperService.DeleteApp:input_type -> developer.DeleteAppRequest
 	25, // 37: developer.DeveloperService.RotateApiKey:input_type -> developer.RotateApiKeyRequest
-	27, // 38: developer.DeveloperService.RotateSigningKeys:input_type -> developer.RotateSigningKeysRequest
-	29, // 39: developer.DeveloperService.ListSigningKeys:input_type -> developer.ListSigningKeysRequest
-	31, // 40: developer.DeveloperService.GetActiveSigningKey:input_type -> developer.GetActiveSigningKeyRequest
-	34, // 41: developer.DeveloperService.AddOAuthProvider:input_type -> developer.AddOAuthProviderRequest
-	36, // 42: developer.DeveloperService.GetOAuthProvider:input_type -> developer.GetOAuthProviderRequest
-	38, // 43: developer.DeveloperService.ListOAuthProviders:input_type -> developer.ListOAuthProvidersRequest
-	40, // 44: developer.DeveloperService.UpdateOAuthProvider:input_type -> developer.UpdateOAuthProviderRequest
-	42, // 45: developer.DeveloperService.DeleteOAuthProvider:input_type -> developer.DeleteOAuthProviderRequest
-	2,  // 46: developer.DeveloperService.Register:output_type -> developer.RegisterResponse
-	4,  // 47: developer.DeveloperService.Login:output_type -> developer.LoginResponse
-	6,  // 48: developer.DeveloperService.Logout:output_type -> developer.LogoutResponse
-	8,  // 49: developer.DeveloperService.GetProfile:output_type -> developer.GetProfileResponse
-	10, // 50: developer.DeveloperService.UpdateProfile:output_type -> developer.UpdateProfileResponse
-	13, // 51: developer.DeveloperService.CreateApp:output_type -> developer.CreateAppResponse
-	15, // 52: developer.DeveloperService.GetApp:output_type -> developer.GetAppResponse
-	17, // 53: developer.DeveloperService.GetPublicApp:output_type -> developer.GetPublicAppResponse
-	19, // 54: developer.DeveloperService.ListApps:output_type -> developer.ListAppsResponse
-	21, // 55: developer.DeveloperService.UpdateApp:output_type -> developer.UpdateAppResponse
-	23, // 56: developer.DeveloperService.DeleteApp:output_type -> developer.DeleteAppResponse
-	26, // 57: developer.DeveloperService.RotateApiKey:output_type -> developer.RotateApiKeyResponse
-	28, // 58: developer.DeveloperService.RotateSigningKeys:output_type -> developer.RotateSigningKeysResponse
-	30, // 59: developer.DeveloperService.ListSigningKeys:output_type -> developer.ListSigningKeysResponse
-	32, // 60: developer.DeveloperService.GetActiveSigningKey:output_type -> developer.GetActiveSigningKeyResponse
-	35, // 61: developer.DeveloperService.AddOAuthProvider:output_type -> developer.AddOAuthProviderResponse
-	37, // 62: developer.DeveloperService.GetOAuthProvider:output_type -> developer.GetOAuthProviderResponse
-	39, // 63: developer.DeveloperService.ListOAuthProviders:output_type -> developer.ListOAuthProvidersResponse
-	41, // 64: developer.DeveloperService.UpdateOAuthProvider:output_type -> developer.UpdateOAuthProviderResponse
-	43, // 65: developer.DeveloperService.DeleteOAuthProvider:output_type -> developer.DeleteOAuthProviderResponse
-	46, // [46:66] is the sub-list for method output_type
-	26, // [26:46] is the sub-list for method input_type
+	27, // 38: developer.DeveloperService.VerifyApiKey:input_type -> developer.VerifyApiKeyRequest
+	29, // 39: developer.DeveloperService.RotateSigningKeys:input_type -> developer.RotateSigningKeysRequest
+	31, // 40: developer.DeveloperService.ListSigningKeys:input_type -> developer.ListSigningKeysRequest
+	33, // 41: developer.DeveloperService.GetActiveSigningKey:input_type -> developer.GetActiveSigningKeyRequest
+	36, // 42: developer.DeveloperService.AddOAuthProvider:input_type -> developer.AddOAuthProviderRequest
+	38, // 43: developer.DeveloperService.GetOAuthProvider:input_type -> developer.GetOAuthProviderRequest
+	40, // 44: developer.DeveloperService.ListOAuthProviders:input_type -> developer.ListOAuthProvidersRequest
+	42, // 45: developer.DeveloperService.UpdateOAuthProvider:input_type -> developer.UpdateOAuthProviderRequest
+	44, // 46: developer.DeveloperService.DeleteOAuthProvider:input_type -> developer.DeleteOAuthProviderRequest
+	2,  // 47: developer.DeveloperService.Register:output_type -> developer.RegisterResponse
+	4,  // 48: developer.DeveloperService.Login:output_type -> developer.LoginResponse
+	6,  // 49: developer.DeveloperService.Logout:output_type -> developer.LogoutResponse
+	8,  // 50: developer.DeveloperService.GetProfile:output_type -> developer.GetProfileResponse
+	10, // 51: developer.DeveloperService.UpdateProfile:output_type -> developer.UpdateProfileResponse
+	13, // 52: developer.DeveloperService.CreateApp:output_type -> developer.CreateAppResponse
+	15, // 53: developer.DeveloperService.GetApp:output_type -> developer.GetAppResponse
+	17, // 54: developer.DeveloperService.GetPublicApp:output_type -> developer.GetPublicAppResponse
+	19, // 55: developer.DeveloperService.ListApps:output_type -> developer.ListAppsResponse
+	21, // 56: developer.DeveloperService.UpdateApp:output_type -> developer.UpdateAppResponse
+	23, // 57: developer.DeveloperService.DeleteApp:output_type -> developer.DeleteAppResponse
+	26, // 58: developer.DeveloperService.RotateApiKey:output_type -> developer.RotateApiKeyResponse
+	28, // 59: developer.DeveloperService.VerifyApiKey:output_type -> developer.VerifyApiKeyResponse
+	30, // 60: developer.DeveloperService.RotateSigningKeys:output_type -> developer.RotateSigningKeysResponse
+	32, // 61: developer.DeveloperService.ListSigningKeys:output_type -> developer.ListSigningKeysResponse
+	34, // 62: developer.DeveloperService.GetActiveSigningKey:output_type -> developer.GetActiveSigningKeyResponse
+	37, // 63: developer.DeveloperService.AddOAuthProvider:output_type -> developer.AddOAuthProviderResponse
+	39, // 64: developer.DeveloperService.GetOAuthProvider:output_type -> developer.GetOAuthProviderResponse
+	41, // 65: developer.DeveloperService.ListOAuthProviders:output_type -> developer.ListOAuthProvidersResponse
+	43, // 66: developer.DeveloperService.UpdateOAuthProvider:output_type -> developer.UpdateOAuthProviderResponse
+	45, // 67: developer.DeveloperService.DeleteOAuthProvider:output_type -> developer.DeleteOAuthProviderResponse
+	47, // [47:68] is the sub-list for method output_type
+	26, // [26:47] is the sub-list for method input_type
 	26, // [26:26] is the sub-list for extension type_name
 	26, // [26:26] is the sub-list for extension extendee
 	0,  // [0:26] is the sub-list for field type_name
@@ -2893,14 +2999,14 @@ func file_proto_developer_developer_proto_init() {
 	}
 	file_proto_developer_developer_proto_msgTypes[9].OneofWrappers = []any{}
 	file_proto_developer_developer_proto_msgTypes[20].OneofWrappers = []any{}
-	file_proto_developer_developer_proto_msgTypes[40].OneofWrappers = []any{}
+	file_proto_developer_developer_proto_msgTypes[42].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_proto_developer_developer_proto_rawDesc), len(file_proto_developer_developer_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   44,
+			NumMessages:   46,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

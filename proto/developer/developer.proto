@@ -28,6 +28,7 @@ service DeveloperService {
 
   // Key Management
   rpc RotateApiKey(RotateApiKeyRequest) returns (RotateApiKeyResponse);
+  rpc VerifyApiKey(VerifyApiKeyRequest) returns (VerifyApiKeyResponse);
   rpc RotateSigningKeys(RotateSigningKeysRequest)
       returns (RotateSigningKeysResponse);
   rpc ListSigningKeys(ListSigningKeysRequest) returns (ListSigningKeysResponse);
@@ -182,6 +183,15 @@ message RotateApiKeyRequest {
 }
 
 message RotateApiKeyResponse { string new_api_key = 1; }
+
+message VerifyApiKeyRequest {
+  string app_id = 1;
+  string api_key = 2;
+}
+
+message VerifyApiKeyResponse {
+  bool valid = 1;
+}
 
 message RotateSigningKeysRequest {
   string app_id = 1;
