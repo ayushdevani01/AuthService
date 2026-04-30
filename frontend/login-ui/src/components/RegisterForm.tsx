@@ -22,7 +22,7 @@ export function RegisterForm({ appId, redirectUri }: { appId: string; redirectUr
 
     setLoading(true);
     try {
-      const { data } = await api.post('/auth/register', { app_id: appId, name: form.name, email: form.email, password: form.password });
+      const { data } = await api.post('/auth/register', { app_id: appId, name: form.name, email: form.email, password: form.password, redirect_uri: redirectUri });
 
       if (data.requires_verification) {
         const message = data.message || 'Account created. Check your inbox and verify your email before signing in.';

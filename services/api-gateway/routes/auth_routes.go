@@ -315,10 +315,11 @@ func (ar *AuthRoutes) JWKS(c *gin.Context) {
 // POST /auth/register
 func (ar *AuthRoutes) Register(c *gin.Context) {
 	var req struct {
-		AppID    string `json:"app_id" binding:"required"`
-		Email    string `json:"email" binding:"required"`
-		Password string `json:"password" binding:"required"`
-		Name     string `json:"name"`
+		AppID       string `json:"app_id" binding:"required"`
+		Email       string `json:"email" binding:"required"`
+		Password    string `json:"password" binding:"required"`
+		Name        string `json:"name"`
+		RedirectURI string `json:"redirect_uri"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -354,6 +355,11 @@ func (ar *AuthRoutes) Register(c *gin.Context) {
 			"requires_verification": true,
 			"message":               "account created, please verify your email before signing in",
 		})
+		return
+	}
+
+	if !isAllowedRedirect(publicApp, req.RedirectURI) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid_redirect_uri"})
 		return
 	}
 
@@ -400,9 +406,10 @@ func (ar *AuthRoutes) Register(c *gin.Context) {
 // POST /auth/login
 func (ar *AuthRoutes) LoginWithEmail(c *gin.Context) {
 	var req struct {
-		AppID    string `json:"app_id" binding:"required"`
-		Email    string `json:"email" binding:"required"`
-		Password string `json:"password" binding:"required"`
+		AppID       string `json:"app_id" binding:"required"`
+		Email       string `json:"email" binding:"required"`
+		Password    string `json:"password" binding:"required"`
+		RedirectURI string `json:"redirect_uri"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -412,6 +419,11 @@ func (ar *AuthRoutes) LoginWithEmail(c *gin.Context) {
 	publicApp, err := ar.getPublicApp(c, req.AppID)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid app_id"})
+		return
+	}
+
+	if !isAllowedRedirect(publicApp, req.RedirectURI) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid_redirect_uri"})
 		return
 	}
 
