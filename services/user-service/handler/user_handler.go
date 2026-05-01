@@ -160,6 +160,9 @@ func (h *UserHandler) HandleOAuthCallback(ctx context.Context, req *pb.HandleOAu
 		if errors.Is(err, service.ErrInvalidVerifier) {
 			return nil, status.Errorf(codes.InvalidArgument, "invalid PKCE code verifier")
 		}
+		if errors.Is(err, service.ErrAccountExistsUseOriginalProvider) {
+			return nil, status.Errorf(codes.AlreadyExists, "account_exists_use_original_provider|%s", redirectURI)
+		}
 		return nil, status.Errorf(codes.Internal, "OAuth callback failed: %v", err)
 	}
 	return &pb.HandleOAuthCallbackResponse{

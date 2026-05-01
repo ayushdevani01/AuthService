@@ -14,6 +14,8 @@ import (
 	"github.com/ayushdevan01/AuthService/services/api-gateway/middleware"
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 type AuthRoutes struct {
@@ -136,6 +138,21 @@ func (ar *AuthRoutes) Callback(c *gin.Context) {
 		State:    state,
 	})
 	if err != nil {
+		if st, ok := status.FromError(err); ok && st.Code() == codes.AlreadyExists {
+			msg := st.Message()
+			if strings.HasPrefix(msg, "account_exists_use_original_provider") {
+				redirectURI := ""
+				if parts := strings.SplitN(msg, "|", 2); len(parts) == 2 {
+					redirectURI = parts[1]
+				}
+				if redirectURI != "" {
+					values := url.Values{}
+					values.Set("error", "account_exists_use_original_provider")
+					c.Redirect(http.StatusFound, buildRedirectURLWithFragment(redirectURI, values))
+					return
+				}
+			}
+		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "OAuth callback failed"})
 		return
 	}

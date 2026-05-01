@@ -11,11 +11,12 @@ import (
 )
 
 var (
-	ErrUserNotFound     = errors.New("user not found")
-	ErrUserExists       = errors.New("user already exists")
-	ErrInvalidPassword  = errors.New("invalid password")
-	ErrAccountBlocked   = errors.New("account temporarily blocked due to too many failed login attempts")
-	ErrEmailNotVerified = errors.New("email not verified")
+	ErrUserNotFound                     = errors.New("user not found")
+	ErrUserExists                       = errors.New("user already exists")
+	ErrAccountExistsUseOriginalProvider = errors.New("account_exists_use_original_provider")
+	ErrInvalidPassword                  = errors.New("invalid password")
+	ErrAccountBlocked                   = errors.New("account temporarily blocked due to too many failed login attempts")
+	ErrEmailNotVerified                 = errors.New("email not verified")
 )
 
 type UserService struct {
@@ -33,59 +34,51 @@ func NewUserService(userRepo *repository.UserRepository, identityRepo *repositor
 }
 
 func (s *UserService) CreateUser(ctx context.Context, appID, email string, name, avatarURL *string, provider string, providerUserID, passwordHash *string, emailVerified bool) (*repository.User, error) {
-	// Check if user already exists for this app
-	existing, err := s.userRepo.FindByEmail(ctx, appID, email)
-	if err == nil && existing != nil {
-		// User exists — add identity if new provider
-		_, identErr := s.identityRepo.FindByUserAndProvider(ctx, existing.ID, provider)
-		if identErr != nil {
-			if errors.Is(identErr, pgx.ErrNoRows) {
-				// Add new identity to existing user (account linking)
-				_, err = s.identityRepo.Create(ctx, existing.ID, provider, providerUserID, passwordHash)
+	// Prefer existing identity for the same provider account (same-provider re-login).
+	if providerUserID != nil && *providerUserID != "" {
+		existingByProvider, err := s.GetUserByProviderID(ctx, appID, provider, *providerUserID)
+		if err == nil && existingByProvider != nil {
+			var updateName, updateAvatarURL *string
+			if name != nil && *name != "" && existingByProvider.Name == "" {
+				updateName = name
+			}
+			if avatarURL != nil && *avatarURL != "" && existingByProvider.AvatarURL == "" {
+				updateAvatarURL = avatarURL
+			}
+			var updateEmailVerified *bool
+			if emailVerified && !existingByProvider.EmailVerified {
+				updateEmailVerified = &emailVerified
+			}
+			if updateName != nil || updateAvatarURL != nil || updateEmailVerified != nil {
+				existingByProvider, err = s.userRepo.Update(ctx, existingByProvider.ID, existingByProvider.AppID, nil, updateName, updateAvatarURL, updateEmailVerified)
 				if err != nil {
 					return nil, err
 				}
-			} else {
-				return nil, identErr
 			}
+			s.userRepo.UpdateLastLogin(ctx, existingByProvider.ID)
+			existingByProvider.Provider = provider
+			existingByProvider.ProviderUserID = *providerUserID
+			return existingByProvider, nil
 		}
+		if err != nil && !errors.Is(err, ErrUserNotFound) {
+			return nil, err
+		}
+	}
 
-		var updateName, updateAvatarURL *string
-		if name != nil && *name != "" && existing.Name == "" {
-			updateName = name
-		}
-		if avatarURL != nil && *avatarURL != "" && existing.AvatarURL == "" {
-			updateAvatarURL = avatarURL
-		}
-
-		// If OAuth provider confirms email is verified but user is not, update it
-		var updateEmailVerified *bool
-		if emailVerified && !existing.EmailVerified {
-			updateEmailVerified = &emailVerified
-		}
-
-		if updateName != nil || updateAvatarURL != nil || updateEmailVerified != nil {
-			existing, err = s.userRepo.Update(ctx, existing.ID, existing.AppID, nil, updateName, updateAvatarURL, updateEmailVerified)
-			if err != nil {
-				return nil, err
-			}
-		}
-
-		// Update last login
-		s.userRepo.UpdateLastLogin(ctx, existing.ID)
-		return existing, nil
+	// Email already belongs to another account — do not silently link providers.
+	existing, err := s.userRepo.FindByEmail(ctx, appID, email)
+	if err == nil && existing != nil {
+		return nil, ErrAccountExistsUseOriginalProvider
 	}
 	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
 		return nil, err
 	}
 
-	// Create new user
 	user, err := s.userRepo.Create(ctx, appID, email, name, avatarURL, emailVerified)
 	if err != nil {
 		return nil, err
 	}
 
-	// Create identity
 	_, err = s.identityRepo.Create(ctx, user.ID, provider, providerUserID, passwordHash)
 	if err != nil {
 		return nil, err
@@ -194,27 +187,12 @@ func (s *UserService) ListUsers(ctx context.Context, appID string, pageSize int,
 }
 
 func (s *UserService) RegisterWithEmail(ctx context.Context, appID, email, password, name string) (*repository.User, error) {
-	// Check if user already has an email identity for this app
 	existing, err := s.userRepo.FindByEmail(ctx, appID, email)
 	if err == nil && existing != nil {
-		_, identErr := s.identityRepo.FindByUserAndProvider(ctx, existing.ID, "email")
-		if identErr == nil {
-			return nil, ErrUserExists
-		}
-		if !errors.Is(identErr, pgx.ErrNoRows) {
-			return nil, identErr
-		}
-
-		// If they don't have an email identity, link the new email/password to this account
-		hash, hashErr := hashPassword(password)
-		if hashErr != nil {
-			return nil, hashErr
-		}
-		_, createErr := s.identityRepo.Create(ctx, existing.ID, "email", nil, &hash)
-		if createErr != nil {
-			return nil, createErr
-		}
-		return existing, nil
+		return nil, ErrUserExists
+	}
+	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+		return nil, err
 	}
 
 	hash, err := hashPassword(password)
