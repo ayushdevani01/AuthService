@@ -5,7 +5,6 @@ import axios from 'axios';
 import { useState } from 'react';
 import toast from 'react-hot-toast';
 import { api } from '@/lib/api';
-import { createPkcePair } from '@/lib/pkce';
 import { Button, Input } from '@/components/ui';
 
 export function LoginForm({ appId, redirectUri }: { appId: string; redirectUri: string }) {
@@ -44,15 +43,10 @@ export function LoginForm({ appId, redirectUri }: { appId: string; redirectUri: 
   async function handleOAuth(provider: 'google' | 'github') {
     setOauthLoading(provider);
     try {
-      const { verifier, challenge } = await createPkcePair();
-      sessionStorage.setItem('code_verifier', verifier);
       const params = new URLSearchParams({
         app_id: appId,
         provider,
         redirect_uri: redirectUri,
-        code_challenge: challenge,
-        code_challenge_method: 'S256',
-        code_verifier: verifier,
       });
       window.location.href = `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}/oauth/authorize?${params.toString()}`;
     } finally {

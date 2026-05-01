@@ -65,14 +65,11 @@ func (ar *AuthRoutes) getPublicApp(c *gin.Context, publicAppID string) (*pbDev.A
 	return resp.App, nil
 }
 
-// GET /oauth/authorize?app_id=xxx&provider=google&redirect_uri=...&code_challenge=...&code_challenge_method=S256
+// GET /oauth/authorize?app_id=xxx&provider=google&redirect_uri=...
 func (ar *AuthRoutes) Authorize(c *gin.Context) {
 	appID := c.Query("app_id")
 	provider := c.Query("provider")
 	redirectURI := c.Query("redirect_uri")
-	codeChallenge := c.Query("code_challenge")
-	challengeMethod := c.Query("code_challenge_method")
-	codeVerifier := c.Query("code_verifier")
 
 	if appID == "" || provider == "" || redirectURI == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "app_id, provider, and redirect_uri are required"})
@@ -99,19 +96,15 @@ func (ar *AuthRoutes) Authorize(c *gin.Context) {
 	}
 
 	resp, err := ar.userClient.InitiateOAuth(c.Request.Context(), &pbUser.InitiateOAuthRequest{
-		AppId:               resolvedAppID,
-		Provider:            provider,
-		RedirectUri:         redirectURI,
-		CodeChallenge:       codeChallenge,
-		CodeChallengeMethod: challengeMethod,
-		CodeVerifier:        codeVerifier,
+		AppId:       resolvedAppID,
+		Provider:    provider,
+		RedirectUri: redirectURI,
 	})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to initiate OAuth"})
 		return
 	}
 
-	// Redirect user to the OAuth provider
 	c.Redirect(http.StatusFound, resp.AuthorizationUrl)
 }
 

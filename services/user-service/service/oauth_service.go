@@ -124,32 +124,28 @@ func (s *OAuthService) getProviderConfig(ctx context.Context, appID, provider st
 	}, nil
 }
 
-func (s *OAuthService) InitiateOAuth(ctx context.Context, appID, provider, redirectURI, codeChallenge, challengeMethod, codeVerifier string) (string, string, error) {
-	// Verify provider is configured
+func (s *OAuthService) InitiateOAuth(ctx context.Context, appID, provider, redirectURI string) (string, string, error) {
 	providerConfig, err := s.getProviderConfig(ctx, appID, provider)
 	if err != nil {
 		return "", "", err
 	}
 
-	if codeChallenge == "" {
-		return "", "", errors.New("PKCE code_challenge is required for OAuth")
+	verifierBytes := make([]byte, 32)
+	if _, err := rand.Read(verifierBytes); err != nil {
+		return "", "", fmt.Errorf("failed to generate PKCE verifier: %w", err)
 	}
-	if codeVerifier == "" {
-		return "", "", errors.New("PKCE code_verifier is required for OAuth")
-	}
-	if challengeMethod == "" {
-		challengeMethod = "S256"
-	}
+	codeVerifier := hex.EncodeToString(verifierBytes)
+	challengeHash := sha256.Sum256([]byte(codeVerifier))
+	codeChallenge := base64.RawURLEncoding.EncodeToString(challengeHash[:])
+	challengeMethod := "S256"
 
-	// Generate state
 	stateBytes := make([]byte, 32)
 	if _, err := rand.Read(stateBytes); err != nil {
 		return "", "", fmt.Errorf("failed to generate state: %w", err)
 	}
 	state := hex.EncodeToString(stateBytes)
 
-	// Store state in Redis with 10 min TTL
-	stateData, _ := json.Marshal(oauthState{
+	stateData, err := json.Marshal(oauthState{
 		AppID:               appID,
 		Provider:            provider,
 		RedirectURI:         redirectURI,
@@ -157,11 +153,14 @@ func (s *OAuthService) InitiateOAuth(ctx context.Context, appID, provider, redir
 		CodeChallengeMethod: challengeMethod,
 		CodeVerifier:        codeVerifier,
 	})
-	s.redisClient.Set(ctx, fmt.Sprintf("oauth_state:%s", state), stateData, 10*time.Minute)
+	if err != nil {
+		return "", "", fmt.Errorf("failed to encode OAuth state: %w", err)
+	}
+	if err := s.redisClient.Set(ctx, fmt.Sprintf("oauth_state:%s", state), stateData, 10*time.Minute).Err(); err != nil {
+		return "", "", fmt.Errorf("failed to store OAuth state: %w", err)
+	}
 
-	// Build authorization URL
 	authURL := s.buildAuthorizationURL(provider, providerConfig.ClientID, state, providerConfig.Scopes, codeChallenge, challengeMethod)
-
 	return authURL, state, nil
 }
 
@@ -476,11 +475,10 @@ func decryptAES(ciphertextB64, key string) (string, error) {
 }
 
 func verifyPKCE(challenge, method, verifier string) bool {
-	if method == "S256" {
-		hash := sha256.Sum256([]byte(verifier))
-		actualChallenge := base64.RawURLEncoding.EncodeToString(hash[:])
-		return actualChallenge == challenge
+	if method != "S256" {
+		return false
 	}
-	// Plain method
-	return verifier == challenge
+	hash := sha256.Sum256([]byte(verifier))
+	actualChallenge := base64.RawURLEncoding.EncodeToString(hash[:])
+	return actualChallenge == challenge
 }
