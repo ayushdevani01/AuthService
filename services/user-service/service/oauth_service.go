@@ -210,11 +210,6 @@ func (s *OAuthService) HandleOAuthCallback(ctx context.Context, provider, code, 
 		return nil, "", "", false, err
 	}
 
-	// Check if user is new
-	_, findErr := s.userService.GetUserByEmail(ctx, stateData.AppID, email)
-	isNewUser := errors.Is(findErr, ErrUserNotFound)
-
-	// Create or update user
 	providerUserIDPtr := &providerUserID
 	var namePtr, avatarURLPtr *string
 	if name != "" {
@@ -223,17 +218,16 @@ func (s *OAuthService) HandleOAuthCallback(ctx context.Context, provider, code, 
 	if avatarURL != "" {
 		avatarURLPtr = &avatarURL
 	}
+
+	_, priorErr := s.userService.GetUserByProviderID(ctx, stateData.AppID, provider, providerUserID)
+	isNewUser := errors.Is(priorErr, ErrUserNotFound)
+
 	user, err := s.userService.CreateUser(ctx, stateData.AppID, email, namePtr, avatarURLPtr, provider, providerUserIDPtr, nil, emailVerified)
 	if err != nil {
-		if errors.Is(err, ErrUserExists) {
-			// Race condition: user was created between our check and create. Fetch them.
-			user, err = s.userService.GetUserByEmail(ctx, stateData.AppID, email)
-			if err != nil {
-				return nil, "", "", false, fmt.Errorf("failed to fetch user after create collision: %w", err)
-			}
-		} else {
-			return nil, "", "", false, err
+		if errors.Is(err, ErrAccountExistsUseOriginalProvider) {
+			return nil, stateData.AppID, stateData.RedirectURI, false, ErrAccountExistsUseOriginalProvider
 		}
+		return nil, "", "", false, err
 	}
 
 	return user, stateData.AppID, stateData.RedirectURI, isNewUser, nil
