@@ -18,7 +18,7 @@ export function LoginForm({ appId, redirectUri }: { appId: string; redirectUri: 
     event.preventDefault();
     setLoading(true);
     try {
-      const { data } = await api.post('/auth/login', { app_id: appId, email, password });
+      const { data } = await api.post('/auth/login', { app_id: appId, email, password, redirect_uri: redirectUri });
       const target = new URL(redirectUri);
       const hash = new URLSearchParams();
       hash.set('access_token', data.access_token);
