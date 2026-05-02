@@ -138,7 +138,7 @@ func (h *UserHandler) ListUsers(ctx context.Context, req *pb.ListUsersRequest) (
 // --- OAuth ---
 
 func (h *UserHandler) InitiateOAuth(ctx context.Context, req *pb.InitiateOAuthRequest) (*pb.InitiateOAuthResponse, error) {
-	authURL, state, err := h.oauthService.InitiateOAuth(ctx, req.AppId, req.Provider, req.RedirectUri, req.CodeChallenge, req.CodeChallengeMethod, req.CodeVerifier)
+	authURL, state, err := h.oauthService.InitiateOAuth(ctx, req.AppId, req.Provider, req.RedirectUri)
 	if err != nil {
 		if errors.Is(err, service.ErrProviderNotConf) {
 			return nil, status.Errorf(codes.NotFound, "OAuth provider not configured: %s", req.Provider)
