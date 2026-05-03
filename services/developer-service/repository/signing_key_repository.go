@@ -51,7 +51,7 @@ func generateRSAKeyPair() (string, string, error) {
 	}
 
 	publicKeyPEM := pem.EncodeToMemory(&pem.Block{
-		Type:  "RSA PUBLIC KEY",
+		Type:  "PUBLIC KEY",
 		Bytes: publicKeyBytes,
 	})
 
