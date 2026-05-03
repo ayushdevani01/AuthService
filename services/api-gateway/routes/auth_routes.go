@@ -611,6 +611,16 @@ func (ar *AuthRoutes) VerifyToken(c *gin.Context) {
 		return
 	}
 
+	authenticatedAppID, ok := c.Get("api_key_app_id")
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "api key required"})
+		return
+	}
+	if authenticatedAppID.(string) != resolvedAppID {
+		c.JSON(http.StatusForbidden, gin.H{"error": "app_id_mismatch"})
+		return
+	}
+
 	token, err := jwt.Parse(req.Token, func(token *jwt.Token) (interface{}, error) {
 		if _, ok := token.Method.(*jwt.SigningMethodRSA); !ok {
 			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])

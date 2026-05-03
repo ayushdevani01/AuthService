@@ -4,9 +4,9 @@ import (
 	"net/http"
 	"strings"
 
+	pbDev "github.com/ayushdevan01/AuthService/proto/developer"
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
-	pbDev "github.com/ayushdevan01/AuthService/proto/developer"
 )
 
 func AuthMiddleware(jwtSecret string) gin.HandlerFunc {
@@ -60,7 +60,7 @@ func AuthMiddleware(jwtSecret string) gin.HandlerFunc {
 	}
 }
 
-func ApiKeyMiddleware(devClient pbDev.DeveloperServiceClient) gin.HandlerFunc {
+func ApiKeyMiddleware(devClient pbDev.DeveloperServiceClient, appResolver *AppResolver) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		apiKey := c.GetHeader("x-api-key")
 		if apiKey == "" {
@@ -93,6 +93,14 @@ func ApiKeyMiddleware(devClient pbDev.DeveloperServiceClient) gin.HandlerFunc {
 			return
 		}
 
+		resolvedAppID, err := appResolver.ResolveAppID(c, appID)
+		if err != nil {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid api key"})
+			c.Abort()
+			return
+		}
+
+		c.Set("api_key_app_id", resolvedAppID)
 		c.Next()
 	}
 }
