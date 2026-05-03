@@ -14,7 +14,10 @@ import (
 )
 
 func main() {
-	cfg := config.Load()
+	cfg, err := config.Load()
+	if err != nil {
+		log.Fatalf("Invalid config: %v", err)
+	}
 
 	db := database.Connect(cfg.DatabaseURL)
 	defer db.Close()
