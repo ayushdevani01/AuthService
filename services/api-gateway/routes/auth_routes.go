@@ -1,7 +1,9 @@
 package routes
 
 import (
+	"crypto/rsa"
 	"encoding/base64"
+	"encoding/pem"
 	"fmt"
 	"math/big"
 	"net/http"
@@ -40,6 +42,24 @@ func buildRedirectURLWithFragment(redirectURI string, values url.Values) string 
 		return redirectURI
 	}
 	return redirectURI + "#" + fragment
+}
+
+func parseRSAPublicKeyPEM(pemBytes []byte) (*rsa.PublicKey, error) {
+	pubKey, err := jwt.ParseRSAPublicKeyFromPEM(pemBytes)
+	if err == nil {
+		return pubKey, nil
+	}
+
+	block, _ := pem.Decode(pemBytes)
+	if block == nil {
+		return nil, err
+	}
+
+	rewrapped := pem.EncodeToMemory(&pem.Block{
+		Type:  "PUBLIC KEY",
+		Bytes: block.Bytes,
+	})
+	return jwt.ParseRSAPublicKeyFromPEM(rewrapped)
 }
 
 func isAllowedRedirect(app *pbDev.App, redirectURI string) bool {
@@ -299,7 +319,7 @@ func (ar *AuthRoutes) JWKS(c *gin.Context) {
 
 	keys := make([]gin.H, 0, len(resp.Keys))
 	for _, k := range resp.Keys {
-		pubKey, err := jwt.ParseRSAPublicKeyFromPEM([]byte(k.PublicKey))
+		pubKey, err := parseRSAPublicKeyPEM([]byte(k.PublicKey))
 		if err != nil {
 			continue
 		}
@@ -611,6 +631,16 @@ func (ar *AuthRoutes) VerifyToken(c *gin.Context) {
 		return
 	}
 
+	authenticatedAppID, ok := c.Get("api_key_app_id")
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "api key required"})
+		return
+	}
+	if authenticatedAppID.(string) != resolvedAppID {
+		c.JSON(http.StatusForbidden, gin.H{"error": "app_id_mismatch"})
+		return
+	}
+
 	token, err := jwt.Parse(req.Token, func(token *jwt.Token) (interface{}, error) {
 		if _, ok := token.Method.(*jwt.SigningMethodRSA); !ok {
 			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
@@ -632,8 +662,7 @@ func (ar *AuthRoutes) VerifyToken(c *gin.Context) {
 		// Find the matching key
 		for _, k := range resp.Keys {
 			if k.Kid == kid {
-				// Parse the PEM public key
-				pubKey, err := jwt.ParseRSAPublicKeyFromPEM([]byte(k.PublicKey))
+				pubKey, err := parseRSAPublicKeyPEM([]byte(k.PublicKey))
 				if err != nil {
 					return nil, fmt.Errorf("failed to parse public key: %w", err)
 				}
@@ -754,7 +783,7 @@ func (ar *AuthRoutes) UserInfo(c *gin.Context) {
 	var pubKey interface{}
 	for _, k := range resp.Keys {
 		if k.Kid == kid {
-			pubKey, err = jwt.ParseRSAPublicKeyFromPEM([]byte(k.PublicKey))
+			pubKey, err = parseRSAPublicKeyPEM([]byte(k.PublicKey))
 			if err != nil {
 				c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to parse public key"})
 				return
