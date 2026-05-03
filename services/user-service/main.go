@@ -37,7 +37,7 @@ func main() {
 	userSvc := service.NewUserService(userRepo, identityRepo, rateLimiter)
 	oauthSvc := service.NewOAuthService(redisClient, db, userSvc, cfg.EncryptionKey, cfg.APIPublicURL)
 	sessionSvc := service.NewSessionService(sessionRepo)
-	resetSvc := service.NewPasswordResetService(resetRepo, identityRepo, userRepo, emailSvc, redisClient)
+	resetSvc := service.NewPasswordResetService(resetRepo, identityRepo, userRepo, sessionRepo, emailSvc, redisClient)
 	emailVerifSvc := service.NewEmailVerificationService(userRepo, emailSvc, redisClient)
 
 	h := handler.NewUserHandler(userSvc, oauthSvc, sessionSvc, resetSvc, emailSvc, emailVerifSvc)

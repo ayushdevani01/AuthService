@@ -85,10 +85,13 @@ func (r *IdentityRepository) FindLatestByUserID(ctx context.Context, userID stri
 	return identity, nil
 }
 
-func (r *IdentityRepository) UpdatePasswordHash(ctx context.Context, userID, newHash string) error {
-	_, err := r.db.Exec(ctx, `
+func (r *IdentityRepository) UpdatePasswordHash(ctx context.Context, userID, newHash string) (int64, error) {
+	tag, err := r.db.Exec(ctx, `
 		UPDATE user_identities SET password_hash = $2
 		WHERE user_id = $1 AND provider = 'email'
 	`, userID, newHash)
-	return err
+	if err != nil {
+		return 0, err
+	}
+	return tag.RowsAffected(), nil
 }
