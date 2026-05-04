@@ -68,7 +68,7 @@ export function LoginForm({ appId, redirectUri }: { appId: string; redirectUri: 
       </form>
       <div className="flex items-center justify-between text-sm" style={{ color: 'var(--muted)' }}>
         <Link href={`/?app_id=${encodeURIComponent(appId)}&redirect_uri=${encodeURIComponent(redirectUri)}&mode=register`} className="underline underline-offset-4" style={{ color: 'var(--foreground)' }}>Create account</Link>
-        <Link href={`/?app_id=${encodeURIComponent(appId)}&mode=forgot`} className="underline underline-offset-4" style={{ color: 'var(--foreground)' }}>Forgot password</Link>
+        <Link href={`/?app_id=${encodeURIComponent(appId)}&redirect_uri=${encodeURIComponent(redirectUri)}&mode=forgot`} className="underline underline-offset-4" style={{ color: 'var(--foreground)' }}>Forgot password</Link>
       </div>
     </div>
   );

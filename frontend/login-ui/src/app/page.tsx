@@ -52,9 +52,9 @@ function HostedLoginInner() {
           <div className="mt-8 rounded-[1.2rem] border p-6" style={{ borderColor: 'var(--border)', background: 'var(--background-alt)' }}>
             {mode === 'login' && appId && redirectUri ? <LoginForm appId={appId} redirectUri={redirectUri} /> : null}
             {mode === 'register' && appId && redirectUri ? <RegisterForm appId={appId} redirectUri={redirectUri} /> : null}
-            {mode === 'forgot' && appId ? <ForgotPasswordForm appId={appId} /> : null}
-            {mode === 'reset' && appId && token ? <ResetPasswordForm appId={appId} token={token} /> : null}
-            {mode === 'verify' && appId && token ? <VerifyEmailView appId={appId} token={token} /> : null}
+            {mode === 'forgot' && appId ? <ForgotPasswordForm appId={appId} redirectUri={redirectUri} /> : null}
+            {mode === 'reset' && appId && token ? <ResetPasswordForm appId={appId} token={token} redirectUri={redirectUri} /> : null}
+            {mode === 'verify' && appId && token ? <VerifyEmailView appId={appId} token={token} redirectUri={redirectUri} /> : null}
             {!appId || (mode !== 'forgot' && mode !== 'verify' && mode !== 'reset' && !redirectUri) ? <p className="text-sm" style={{ color: 'var(--muted)' }}>Required query parameters are missing.</p> : null}
           </div>
         </Panel>
