@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"net/url"
 
 	"github.com/resend/resend-go/v2"
 )
@@ -29,8 +30,11 @@ func NewEmailService(apiKey, platformURL, fromAddress string) *EmailService {
 	}
 }
 
-func (s *EmailService) SendPasswordReset(ctx context.Context, appID, toEmail, userName, rawToken string) error {
+func (s *EmailService) SendPasswordReset(ctx context.Context, appID, toEmail, userName, rawToken, redirectURI string) error {
 	resetLink := fmt.Sprintf("%s/?mode=reset&app_id=%s&token=%s", s.platformURL, appID, rawToken)
+	if redirectURI != "" {
+		resetLink = fmt.Sprintf("%s&redirect_uri=%s", resetLink, url.QueryEscape(redirectURI))
+	}
 
 	html := fmt.Sprintf(`
 <!DOCTYPE html>
@@ -60,8 +64,11 @@ func (s *EmailService) SendPasswordReset(ctx context.Context, appID, toEmail, us
 	return err
 }
 
-func (s *EmailService) SendEmailVerification(ctx context.Context, appID, toEmail, userName, verifyToken string) error {
+func (s *EmailService) SendEmailVerification(ctx context.Context, appID, toEmail, userName, verifyToken, redirectURI string) error {
 	verifyLink := fmt.Sprintf("%s/?mode=verify&app_id=%s&token=%s", s.platformURL, appID, verifyToken)
+	if redirectURI != "" {
+		verifyLink = fmt.Sprintf("%s&redirect_uri=%s", verifyLink, url.QueryEscape(redirectURI))
+	}
 
 	html := fmt.Sprintf(`
 <!DOCTYPE html>

@@ -523,8 +523,9 @@ func (ar *AuthRoutes) LoginWithEmail(c *gin.Context) {
 // POST /auth/forgot-password
 func (ar *AuthRoutes) ForgotPassword(c *gin.Context) {
 	var req struct {
-		AppID string `json:"app_id" binding:"required"`
-		Email string `json:"email" binding:"required"`
+		AppID       string `json:"app_id" binding:"required"`
+		Email       string `json:"email" binding:"required"`
+		RedirectURI string `json:"redirect_uri"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -538,8 +539,9 @@ func (ar *AuthRoutes) ForgotPassword(c *gin.Context) {
 	}
 
 	ar.userClient.ForgotPassword(c.Request.Context(), &pbUser.ForgotPasswordRequest{
-		AppId: resolvedAppID,
-		Email: req.Email,
+		AppId:       resolvedAppID,
+		Email:       req.Email,
+		RedirectUri: req.RedirectURI,
 	})
 
 	// Always return success regardless of whether email exists

@@ -1394,6 +1394,7 @@ type ForgotPasswordRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	AppId         string                 `protobuf:"bytes,1,opt,name=app_id,json=appId,proto3" json:"app_id,omitempty"`
 	Email         string                 `protobuf:"bytes,2,opt,name=email,proto3" json:"email,omitempty"`
+	RedirectUri   string                 `protobuf:"bytes,3,opt,name=redirect_uri,json=redirectUri,proto3" json:"redirect_uri,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1438,6 +1439,13 @@ func (x *ForgotPasswordRequest) GetAppId() string {
 func (x *ForgotPasswordRequest) GetEmail() string {
 	if x != nil {
 		return x.Email
+	}
+	return ""
+}
+
+func (x *ForgotPasswordRequest) GetRedirectUri() string {
+	if x != nil {
+		return x.RedirectUri
 	}
 	return ""
 }
@@ -2593,10 +2601,11 @@ const file_proto_user_user_proto_rawDesc = "" +
 	".user.UserR\x04user\x12\x18\n" +
 	"\asuccess\x18\x02 \x01(\bR\asuccess\x12#\n" +
 	"\rerror_message\x18\x03 \x01(\tR\ferrorMessage\x123\n" +
-	"\x15requires_verification\x18\x04 \x01(\bR\x14requiresVerification\"D\n" +
+	"\x15requires_verification\x18\x04 \x01(\bR\x14requiresVerification\"g\n" +
 	"\x15ForgotPasswordRequest\x12\x15\n" +
 	"\x06app_id\x18\x01 \x01(\tR\x05appId\x12\x14\n" +
-	"\x05email\x18\x02 \x01(\tR\x05email\"7\n" +
+	"\x05email\x18\x02 \x01(\tR\x05email\x12!\n" +
+	"\fredirect_uri\x18\x03 \x01(\tR\vredirectUri\"7\n" +
 	"\x16ForgotPasswordResponse\x12\x1d\n" +
 	"\n" +
 	"email_sent\x18\x01 \x01(\bR\temailSent\"f\n" +

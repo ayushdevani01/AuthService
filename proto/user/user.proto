@@ -182,6 +182,7 @@ message LoginWithEmailResponse {
 message ForgotPasswordRequest {
   string app_id = 1;
   string email = 2;
+  string redirect_uri = 3;
 }
 
 message ForgotPasswordResponse { bool email_sent = 1; }
