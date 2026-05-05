@@ -288,16 +288,9 @@ func (s *OAuthService) handleGithubCallback(ctx context.Context, code, codeVerif
 		return "", "", "", "", false, fmt.Errorf("failed to decode GitHub user info: %w", err)
 	}
 
-	email := userInfo.Email
-	emailVerified := false
-
-	if email == "" {
-		email, emailVerified, err = s.fetchGithubEmail(ctx, accessToken)
-		if err != nil {
-			return "", "", "", "", false, err
-		}
-	} else {
-		emailVerified = true
+	email, emailVerified, err := s.fetchGithubEmail(ctx, accessToken)
+	if err != nil {
+		return "", "", "", "", false, err
 	}
 
 	providerUserID := fmt.Sprintf("%d", userInfo.ID)
@@ -402,40 +395,33 @@ func exchangeCodeForTokenJSON(tokenURL, code, codeVerifier, clientID, clientSecr
 // buildAuthorizationURL builds provider-specific authorization URL
 func (s *OAuthService) buildAuthorizationURL(provider, clientID, state string, scopes []string, codeChallenge, challengeMethod string) string {
 	callbackURL := fmt.Sprintf("%s/oauth/callback/%s", s.callbackBaseURL, provider)
+	values := url.Values{}
+	values.Set("client_id", clientID)
+	values.Set("redirect_uri", callbackURL)
+	values.Set("state", state)
+	values.Set("code_challenge", codeChallenge)
+	values.Set("code_challenge_method", challengeMethod)
 
 	switch provider {
 	case "google":
 		scopeStr := "openid email profile"
 		if len(scopes) > 0 {
-			scopeStr = joinScopes(scopes)
+			scopeStr = strings.Join(scopes, " ")
 		}
-		return fmt.Sprintf(
-			"https://accounts.google.com/o/oauth2/v2/auth?client_id=%s&redirect_uri=%s&response_type=code&scope=%s&state=%s&access_type=offline&code_challenge=%s&code_challenge_method=%s",
-			clientID, callbackURL, scopeStr, state, codeChallenge, challengeMethod,
-		)
+		values.Set("response_type", "code")
+		values.Set("scope", scopeStr)
+		values.Set("access_type", "offline")
+		return "https://accounts.google.com/o/oauth2/v2/auth?" + values.Encode()
 	case "github":
 		scopeStr := "user:email"
 		if len(scopes) > 0 {
-			scopeStr = joinScopes(scopes)
+			scopeStr = strings.Join(scopes, " ")
 		}
-		return fmt.Sprintf(
-			"https://github.com/login/oauth/authorize?client_id=%s&redirect_uri=%s&scope=%s&state=%s&code_challenge=%s&code_challenge_method=%s",
-			clientID, callbackURL, scopeStr, state, codeChallenge, challengeMethod,
-		)
+		values.Set("scope", scopeStr)
+		return "https://github.com/login/oauth/authorize?" + values.Encode()
 	default:
 		return ""
 	}
-}
-
-func joinScopes(scopes []string) string {
-	result := ""
-	for i, s := range scopes {
-		if i > 0 {
-			result += " "
-		}
-		result += s
-	}
-	return result
 }
 
 // decryptAES decrypts AES-256-GCM encrypted text (same as developer-service/auth/encryption.go)
