@@ -56,7 +56,7 @@ func (s *EmailVerificationService) SendVerification(ctx context.Context, appID, 
 	if name == "" {
 		name = email
 	}
-	return s.emailSvc.SendEmailVerification(ctx, appID, email, name, rawToken)
+	return s.emailSvc.SendEmailVerification(ctx, appID, email, name, rawToken, "")
 }
 
 // VerifyEmail validates the token and marks the user's email as verified.

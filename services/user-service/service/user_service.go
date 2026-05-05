@@ -138,7 +138,7 @@ func (s *UserService) UpdateUser(ctx context.Context, userID, appID string, emai
 		return nil, err
 	}
 	if passwordHash != nil {
-		if err := s.identityRepo.UpdatePasswordHash(ctx, userID, *passwordHash); err != nil {
+		if _, err := s.identityRepo.UpdatePasswordHash(ctx, userID, *passwordHash); err != nil {
 			return nil, err
 		}
 	}

@@ -7,7 +7,7 @@ import toast from 'react-hot-toast';
 import { api } from '@/lib/api';
 import { Button, Input } from '@/components/ui';
 
-export function ResetPasswordForm({ appId, token }: { appId: string; token: string }) {
+export function ResetPasswordForm({ appId, token, redirectUri }: { appId: string; token: string; redirectUri: string }) {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -30,6 +30,24 @@ export function ResetPasswordForm({ appId, token }: { appId: string; token: stri
     }
   }
 
-  if (done) return <div className="space-y-4"><p className="text-sm" style={{ color: 'var(--muted)' }}>Password reset successfully.</p><Link href={`/?app_id=${encodeURIComponent(appId)}`} className="text-sm underline underline-offset-4" style={{ color: 'var(--foreground)' }}>Return to login</Link></div>;
-  return <form className="space-y-4" onSubmit={handleSubmit}><Input type="password" placeholder="New password" required value={password} onChange={(event) => setPassword(event.target.value)} /><Input type="password" placeholder="Confirm password" required value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} /><Button type="submit" className="w-full justify-center" loading={loading}>Reset Password</Button></form>;
+  const loginHref = redirectUri
+    ? `/?app_id=${encodeURIComponent(appId)}&redirect_uri=${encodeURIComponent(redirectUri)}`
+    : `/?app_id=${encodeURIComponent(appId)}`;
+
+  if (done) {
+    return (
+      <div className="space-y-4">
+        <p className="text-sm" style={{ color: 'var(--muted)' }}>Password reset successfully.</p>
+        <Link href={loginHref} className="text-sm underline underline-offset-4" style={{ color: 'var(--foreground)' }}>Return to login</Link>
+      </div>
+    );
+  }
+
+  return (
+    <form className="space-y-4" onSubmit={handleSubmit}>
+      <Input type="password" placeholder="New password" required value={password} onChange={(event) => setPassword(event.target.value)} />
+      <Input type="password" placeholder="Confirm password" required value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} />
+      <Button type="submit" className="w-full justify-center" loading={loading}>Reset Password</Button>
+    </form>
+  );
 }

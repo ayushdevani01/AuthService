@@ -234,7 +234,7 @@ func (h *UserHandler) ForgotPassword(ctx context.Context, req *pb.ForgotPassword
 	go func() {
 		bgCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
-		err := h.passwordResetService.InitiateReset(bgCtx, req.AppId, req.Email)
+		err := h.passwordResetService.InitiateReset(bgCtx, req.AppId, req.Email, req.RedirectUri)
 		if err != nil {
 			log.Printf("ForgotPassword failed for email %s: %v", req.Email, err)
 		}
@@ -250,6 +250,8 @@ func (h *UserHandler) ResetPassword(ctx context.Context, req *pb.ResetPasswordRe
 			return &pb.ResetPasswordResponse{Success: false, ErrorMessage: "invalid or expired reset token"}, nil
 		case errors.Is(err, service.ErrResetTokenUsed):
 			return &pb.ResetPasswordResponse{Success: false, ErrorMessage: "reset token already used"}, nil
+		case errors.Is(err, service.ErrNoPasswordIdentity):
+			return &pb.ResetPasswordResponse{Success: false, ErrorMessage: "no_password_identity"}, nil
 		default:
 			return nil, status.Errorf(codes.Internal, "password reset failed: %v", err)
 		}
