@@ -24,12 +24,15 @@ export class AuthVerifier {
 
   constructor(options?: AuthOptions) {
     this.appId = options?.appId || process.env.AUTH_APP_ID || '';
-    this.audience = options?.audience || process.env.AUTH_AUDIENCE || this.appId;
+    this.audience = options?.audience || process.env.AUTH_AUDIENCE || '';
     this.apiUrl = options?.apiUrl || process.env.AUTH_API_URL || 'http://localhost:8080';
     this.issuer = options?.issuer || process.env.AUTH_ISSUER || 'https://auth.yourplatform.com';
 
     if (!this.appId) {
       throw new Error('AUTH_APP_ID is required. Pass it in options or set it as an environment variable.');
+    }
+    if (!this.audience) {
+      throw new Error('AUTH_AUDIENCE is required. Pass audience in options or set AUTH_AUDIENCE to the internal app UUID used as the JWT aud claim.');
     }
 
     this.jwksUrl = new URL(`${this.apiUrl}/api/v1/apps/${this.appId}/jwks`);

@@ -25,12 +25,17 @@ var (
 type TokenService struct {
 	signingKeyRepo *repository.SigningKeyRepository
 	sessionRepo    *repository.SessionRepository
+	issuer         string
 }
 
-func NewTokenService(signingKeyRepo *repository.SigningKeyRepository, sessionRepo *repository.SessionRepository) *TokenService {
+func NewTokenService(signingKeyRepo *repository.SigningKeyRepository, sessionRepo *repository.SessionRepository, issuer string) *TokenService {
+	if issuer == "" {
+		issuer = "https://auth.yourplatform.com"
+	}
 	return &TokenService{
 		signingKeyRepo: signingKeyRepo,
 		sessionRepo:    sessionRepo,
+		issuer:         issuer,
 	}
 }
 
@@ -68,7 +73,7 @@ func (s *TokenService) GenerateTokenPair(ctx context.Context, appID, userID, ema
 
 	// Build JWT claims
 	claims := jwt.MapClaims{
-		"iss":            "https://auth.yourplatform.com",
+		"iss":            s.issuer,
 		"sub":            userID,
 		"aud":            appID,
 		"exp":            accessExp.Unix(),
@@ -136,7 +141,7 @@ func (s *TokenService) RefreshTokens(ctx context.Context, refreshToken, appID st
 	accessExp := now.Add(1 * time.Hour)
 
 	claims := jwt.MapClaims{
-		"iss":            "https://auth.yourplatform.com",
+		"iss":            s.issuer,
 		"sub":            session.UserID,
 		"aud":            appID,
 		"exp":            accessExp.Unix(),
@@ -166,11 +171,11 @@ func (s *TokenService) RefreshTokens(ctx context.Context, refreshToken, appID st
 		newRefreshToken = &rt
 
 		newHash := repository.HashToken(rt)
-		newExpTime := now.Add(30 * 24 * time.Hour)
+		newExpTime := session.ExpiresAt
 		exp := newExpTime.Unix()
 		newRefreshExp = &exp
 
-		if err := s.sessionRepo.UpdateRefreshToken(ctx, session.ID, newHash, newExpTime); err != nil {
+		if err := s.sessionRepo.UpdateRefreshToken(ctx, session.ID, refreshHash, newHash, newExpTime); err != nil {
 			return "", nil, 0, nil, fmt.Errorf("failed to rotate refresh token: %w", err)
 		}
 	}

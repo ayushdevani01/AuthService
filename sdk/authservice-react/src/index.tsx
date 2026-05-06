@@ -5,6 +5,7 @@ type AuthUser = {
   email?: string;
   aud?: string | string[];
   iss?: string;
+  exp?: number;
   [key: string]: unknown;
 };
 
@@ -29,6 +30,7 @@ type AuthServiceProviderProps = {
   appId: string;
   authUrl: string;
   redirectUri: string;
+  apiUrl?: string;
   storageKey?: string;
   children: React.ReactNode;
 };
@@ -49,6 +51,21 @@ function parseJwtPayload(token: string): AuthUser | null {
   } catch {
     return null;
   }
+}
+
+function sessionExpired(session: StoredSession | null): boolean {
+  if (!session?.accessToken) return true;
+  if (session.expiresAt) {
+    const expiresAt = Number(session.expiresAt);
+    if (!Number.isNaN(expiresAt) && expiresAt * 1000 <= Date.now()) {
+      return true;
+    }
+  }
+  const payload = parseJwtPayload(session.accessToken);
+  if (payload?.exp && payload.exp * 1000 <= Date.now()) {
+    return true;
+  }
+  return false;
 }
 
 function readSession(storageKey: string): StoredSession | null {
@@ -72,13 +89,40 @@ function writeSession(storageKey: string, session: StoredSession | null) {
   window.localStorage.setItem(key, JSON.stringify(session));
 }
 
-export function AuthServiceProvider({ appId, authUrl, redirectUri, storageKey = 'authservice', children }: AuthServiceProviderProps) {
+function resolveApiUrl(authUrl: string, apiUrl?: string) {
+  if (apiUrl) return apiUrl.replace(/\/$/, '');
+  if (typeof window !== 'undefined' && process.env.NEXT_PUBLIC_API_URL) {
+    return process.env.NEXT_PUBLIC_API_URL.replace(/\/$/, '');
+  }
+  try {
+    const parsed = new URL(authUrl);
+    if (parsed.port === '3001') {
+      parsed.port = '8080';
+    }
+    return parsed.origin;
+  } catch {
+    return 'http://localhost:8080';
+  }
+}
+
+export function AuthServiceProvider({
+  appId,
+  authUrl,
+  redirectUri,
+  apiUrl,
+  storageKey = 'authservice',
+  children,
+}: AuthServiceProviderProps) {
   const [session, setSession] = useState<StoredSession | null>(null);
   const [loading, setLoading] = useState(true);
+  const resolvedApiUrl = useMemo(() => resolveApiUrl(authUrl, apiUrl), [authUrl, apiUrl]);
 
   useEffect(() => {
     const existing = readSession(storageKey);
-    if (existing) {
+    if (existing && sessionExpired(existing)) {
+      writeSession(storageKey, null);
+      setSession(null);
+    } else if (existing) {
       setSession(existing);
     }
     setLoading(false);
@@ -95,27 +139,39 @@ export function AuthServiceProvider({ appId, authUrl, redirectUri, storageKey = 
   }, [appId, authUrl, redirectUri]);
 
   const logout = useCallback((options?: { redirectTo?: string }) => {
+    const current = readSession(storageKey);
+    if (current?.refreshToken) {
+      void fetch(`${resolvedApiUrl}/oauth/revoke`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          token: current.refreshToken,
+          token_type: 'refresh',
+          app_id: appId,
+        }),
+      }).catch(() => undefined);
+    }
     writeSession(storageKey, null);
     setSession(null);
     if (options?.redirectTo) {
       window.location.href = options.redirectTo;
     }
-  }, [storageKey]);
+  }, [appId, resolvedApiUrl, storageKey]);
 
   const user = useMemo(() => {
-    if (!session?.accessToken) return null;
+    if (!session?.accessToken || sessionExpired(session)) return null;
     return parseJwtPayload(session.accessToken);
-  }, [session?.accessToken]);
+  }, [session]);
 
   const value = useMemo<AuthContextValue>(() => ({
     user,
-    isAuthenticated: Boolean(session?.accessToken),
+    isAuthenticated: Boolean(session?.accessToken) && !sessionExpired(session),
     loading,
     accessToken: session?.accessToken || null,
     login,
     logout,
-    getAccessToken: () => session?.accessToken || null,
-  }), [user, session?.accessToken, loading, login, logout]);
+    getAccessToken: () => (session && !sessionExpired(session) ? session.accessToken : null),
+  }), [user, session, loading, login, logout]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
@@ -151,6 +207,7 @@ export function AuthCallbackHandler({ storageKey = 'authservice', onSuccess, fal
     };
 
     writeSession(storageKey, session);
+    window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}`);
     onSuccess?.(session);
   }, [storageKey, onSuccess]);
 

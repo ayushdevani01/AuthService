@@ -30,7 +30,7 @@ func main() {
 	sessionRepo := repository.NewSessionRepository(db, redisClient)
 
 	// Service
-	tokenSvc := service.NewTokenService(signingKeyRepo, sessionRepo)
+	tokenSvc := service.NewTokenService(signingKeyRepo, sessionRepo, cfg.Issuer)
 
 	// Handler
 	h := handler.NewTokenHandler(tokenSvc)

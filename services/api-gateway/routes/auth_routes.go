@@ -25,14 +25,19 @@ type AuthRoutes struct {
 	userClient  pbUser.UserServiceClient
 	tokenClient pbToken.TokenServiceClient
 	appResolver *middleware.AppResolver
+	issuer      string
 }
 
-func NewAuthRoutes(devClient pbDev.DeveloperServiceClient, userClient pbUser.UserServiceClient, tokenClient pbToken.TokenServiceClient, appResolver *middleware.AppResolver) *AuthRoutes {
+func NewAuthRoutes(devClient pbDev.DeveloperServiceClient, userClient pbUser.UserServiceClient, tokenClient pbToken.TokenServiceClient, appResolver *middleware.AppResolver, issuer string) *AuthRoutes {
+	if issuer == "" {
+		issuer = "https://auth.yourplatform.com"
+	}
 	return &AuthRoutes{
 		devClient:   devClient,
 		userClient:  userClient,
 		tokenClient: tokenClient,
 		appResolver: appResolver,
+		issuer:      issuer,
 	}
 }
 
@@ -185,12 +190,13 @@ func (ar *AuthRoutes) Callback(c *gin.Context) {
 
 	// Generate token pair
 	tokenResp, err := ar.tokenClient.GenerateTokenPair(c.Request.Context(), &pbToken.GenerateTokenPairRequest{
-		AppId:         callbackResp.AppId,
-		UserId:        callbackResp.User.Id,
-		Email:         callbackResp.User.Email,
-		Provider:      provider,
-		EmailVerified: callbackResp.User.EmailVerified,
-		SessionId:     sessionResp.Session.Id,
+		AppId:           callbackResp.AppId,
+		UserId:          callbackResp.User.Id,
+		Email:           callbackResp.User.Email,
+		Provider:        provider,
+		EmailVerified:   callbackResp.User.EmailVerified,
+		SessionId:       sessionResp.Session.Id,
+		RefreshTokenTtl: 30 * 24 * 60 * 60,
 	})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to generate tokens"})
@@ -406,12 +412,13 @@ func (ar *AuthRoutes) Register(c *gin.Context) {
 	}
 
 	tokenResp, err := ar.tokenClient.GenerateTokenPair(c.Request.Context(), &pbToken.GenerateTokenPairRequest{
-		AppId:         resolvedAppID,
-		UserId:        userResp.User.Id,
-		Email:         userResp.User.Email,
-		Provider:      "email",
-		EmailVerified: userResp.User.EmailVerified,
-		SessionId:     sessionResp.Session.Id,
+		AppId:           resolvedAppID,
+		UserId:          userResp.User.Id,
+		Email:           userResp.User.Email,
+		Provider:        "email",
+		EmailVerified:   userResp.User.EmailVerified,
+		SessionId:       sessionResp.Session.Id,
+		RefreshTokenTtl: 30 * 24 * 60 * 60,
 	})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to generate tokens"})
@@ -494,12 +501,13 @@ func (ar *AuthRoutes) LoginWithEmail(c *gin.Context) {
 	}
 
 	tokenResp, err := ar.tokenClient.GenerateTokenPair(c.Request.Context(), &pbToken.GenerateTokenPairRequest{
-		AppId:         resolvedAppID,
-		UserId:        loginResp.User.Id,
-		Email:         loginResp.User.Email,
-		Provider:      "email",
-		EmailVerified: loginResp.User.EmailVerified,
-		SessionId:     sessionResp.Session.Id,
+		AppId:           resolvedAppID,
+		UserId:          loginResp.User.Id,
+		Email:           loginResp.User.Email,
+		Provider:        "email",
+		EmailVerified:   loginResp.User.EmailVerified,
+		SessionId:       sessionResp.Session.Id,
+		RefreshTokenTtl: 30 * 24 * 60 * 60,
 	})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to generate tokens"})
@@ -673,7 +681,7 @@ func (ar *AuthRoutes) VerifyToken(c *gin.Context) {
 		}
 
 		return nil, fmt.Errorf("public key '%s' not found for app '%s'", kid, req.AppID)
-	}, jwt.WithIssuer("https://auth.yourplatform.com"), jwt.WithAudience(resolvedAppID))
+	}, jwt.WithIssuer(ar.issuer), jwt.WithAudience(resolvedAppID))
 
 	if err != nil || !token.Valid {
 		errMsg := "invalid token"
@@ -804,7 +812,7 @@ func (ar *AuthRoutes) UserInfo(c *gin.Context) {
 			return nil, fmt.Errorf("unexpected signing method")
 		}
 		return pubKey, nil
-	}, jwt.WithIssuer("https://auth.yourplatform.com"), jwt.WithAudience(resolvedAppID))
+	}, jwt.WithIssuer(ar.issuer), jwt.WithAudience(resolvedAppID))
 
 	if err != nil || !verifiedToken.Valid {
 		errMsg := "invalid or expired token"

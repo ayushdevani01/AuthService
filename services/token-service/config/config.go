@@ -12,6 +12,7 @@ type Config struct {
 	GRPCPort      string
 	RedisURL      string
 	EncryptionKey string
+	Issuer        string
 }
 
 func Load() (*Config, error) {
@@ -20,6 +21,7 @@ func Load() (*Config, error) {
 		GRPCPort:      getEnv("GRPC_PORT", "50052"),
 		RedisURL:      getEnv("REDIS_URL", "localhost:6379"),
 		EncryptionKey: getEnv("ENCRYPTION_KEY", defaultEncryptionKey),
+		Issuer:        getEnv("AUTH_ISSUER", "https://auth.yourplatform.com"),
 	}
 	if len(cfg.EncryptionKey) != 32 {
 		return nil, fmt.Errorf("ENCRYPTION_KEY must be exactly 32 bytes, got %d", len(cfg.EncryptionKey))
