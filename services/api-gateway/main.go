@@ -55,7 +55,7 @@ func main() {
 
 	// Route handlers
 	devRoutes := routes.NewDeveloperRoutes(devClient, userClient)
-	authRoutes := routes.NewAuthRoutes(devClient, userClient, tokenClient, appResolver)
+	authRoutes := routes.NewAuthRoutes(devClient, userClient, tokenClient, appResolver, cfg.Issuer)
 
 	r := gin.Default()
 	if err := r.SetTrustedProxies(nil); err != nil {

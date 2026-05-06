@@ -9,6 +9,7 @@ type Config struct {
 	UserServiceAddr      string
 	TokenServiceAddr     string
 	JWTSecret            string
+	Issuer               string
 }
 
 func Load() *Config {
@@ -19,6 +20,7 @@ func Load() *Config {
 		UserServiceAddr:      getEnv("USER_SERVICE_ADDR", "localhost:50053"),
 		TokenServiceAddr:     getEnv("TOKEN_SERVICE_ADDR", "localhost:50052"),
 		JWTSecret:            getEnv("JWT_SECRET", "dev-secret-change-in-production"),
+		Issuer:               getEnv("AUTH_ISSUER", "https://auth.yourplatform.com"),
 	}
 }
 
