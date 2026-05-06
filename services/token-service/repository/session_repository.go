@@ -110,31 +110,20 @@ func (r *SessionRepository) Revoke(ctx context.Context, sessionID string) error 
 	return nil
 }
 
-func (r *SessionRepository) UpdateRefreshToken(ctx context.Context, sessionID, newHash string, newExpiresAt time.Time) error {
-	// Get old hash first so we can clean up Redis
-	var oldHash string
+func (r *SessionRepository) UpdateRefreshToken(ctx context.Context, sessionID, oldHash, newHash string, newExpiresAt time.Time) error {
 	var userID, appID string
 	err := r.db.QueryRow(ctx, `
-		SELECT refresh_token_hash, user_id, app_id FROM sessions
-		WHERE id = $1 AND revoked_at IS NULL
-	`, sessionID).Scan(&oldHash, &userID, &appID)
+		UPDATE sessions
+		SET refresh_token_hash = $3, expires_at = $4
+		WHERE id = $1 AND refresh_token_hash = $2 AND revoked_at IS NULL
+		RETURNING user_id, app_id
+	`, sessionID, oldHash, newHash, newExpiresAt).Scan(&userID, &appID)
 	if err != nil {
 		return err
 	}
 
-	// Update in Postgres
-	_, err = r.db.Exec(ctx, `
-		UPDATE sessions SET refresh_token_hash = $2, expires_at = $3
-		WHERE id = $1 AND revoked_at IS NULL
-	`, sessionID, newHash, newExpiresAt)
-	if err != nil {
-		return err
-	}
-
-	// Remove old Redis cache entry
 	r.redis.Del(ctx, fmt.Sprintf("session:%s", oldHash))
 
-	// Set new Redis cache entry
 	cacheData, _ := json.Marshal(sessionCache{
 		UserID:    userID,
 		AppID:     appID,
