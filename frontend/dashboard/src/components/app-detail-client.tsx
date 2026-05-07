@@ -30,7 +30,7 @@ function summarizePublicKey(publicKey: string) {
   const lines = publicKey.split('\n').map((line) => line.trim()).filter(Boolean);
   if (lines.length <= 2) return publicKey;
 
-  const body = lines.filter((line) => !line.includes('BEGIN RSA PUBLIC KEY') && !line.includes('END RSA PUBLIC KEY'));
+  const body = lines.filter((line) => !line.includes('BEGIN') && !line.includes('END'));
   if (body.length === 0) return publicKey;
 
   const first = body[0];
@@ -40,7 +40,7 @@ function summarizePublicKey(publicKey: string) {
 
 function extractPublicKeyBody(publicKey: string) {
   const lines = publicKey.split('\n').map((line) => line.trim()).filter(Boolean);
-  const body = lines.filter((line) => !line.includes('BEGIN RSA PUBLIC KEY') && !line.includes('END RSA PUBLIC KEY'));
+  const body = lines.filter((line) => !line.includes('BEGIN') && !line.includes('END'));
   return body.join('\n');
 }
 
@@ -49,7 +49,7 @@ export function AppDetailClient({ appId }: Props) {
   const [app, setApp] = useState<AppRecord | null>(null);
   const [activeTab, setActiveTab] = useState<TabKey>('overview');
   const [loading, setLoading] = useState(true);
-  const [settingsForm, setSettingsForm] = useState({ name: '', redirect_urls: '' });
+  const [settingsForm, setSettingsForm] = useState({ name: '', redirect_urls: '', require_email_verification: false });
   const [savingSettings, setSavingSettings] = useState(false);
   const [providers, setProviders] = useState<OAuthProvider[]>([]);
   const [providerForm, setProviderForm] = useState<{ provider: 'google' | 'github'; client_id: string; client_secret: string; scopes: string[]; enabled: boolean }>({
@@ -92,6 +92,7 @@ export function AppDetailClient({ appId }: Props) {
       setSettingsForm({
         name: data.app.name || '',
         redirect_urls: (data.app.redirect_urls || []).join('\n'),
+        require_email_verification: Boolean(data.app.require_email_verification),
       });
     } catch (error) {
       if (axios.isAxiosError(error)) toast.error(error.response?.data?.error || 'Failed to load app');
@@ -149,9 +150,16 @@ export function AppDetailClient({ appId }: Props) {
       if (settingsForm.redirect_urls !== currentRedirects) {
         payload.redirect_urls = settingsForm.redirect_urls.split('\n').map((item) => item.trim()).filter(Boolean);
       }
+      if (settingsForm.require_email_verification !== Boolean(app.require_email_verification)) {
+        payload.require_email_verification = settingsForm.require_email_verification;
+      }
       const { data } = await api.patch(`/api/v1/developers/apps/${appId}`, payload);
       setApp(data.app);
-      setSettingsForm({ name: data.app.name || '', redirect_urls: (data.app.redirect_urls || []).join('\n') });
+      setSettingsForm({
+        name: data.app.name || '',
+        redirect_urls: (data.app.redirect_urls || []).join('\n'),
+        require_email_verification: Boolean(data.app.require_email_verification),
+      });
       toast.success('App updated');
     } catch (error) {
       if (axios.isAxiosError(error)) toast.error(error.response?.data?.error || 'Failed to update app');
@@ -177,7 +185,12 @@ export function AppDetailClient({ appId }: Props) {
 
   function requestSaveProvider(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!providerForm.client_id.trim() || !providerForm.client_secret.trim()) {
+    const existing = providers.find((provider) => provider.provider === providerForm.provider);
+    if (!providerForm.client_id.trim()) {
+      toast.error('Client ID is required');
+      return;
+    }
+    if (!existing && !providerForm.client_secret.trim()) {
       toast.error('Client ID and client secret are required');
       return;
     }
@@ -192,12 +205,14 @@ export function AppDetailClient({ appId }: Props) {
     setProviderLoading(true);
     try {
       const existing = providers.find((provider) => provider.provider === providerForm.provider);
-      const payload = {
+      const payload: Record<string, unknown> = {
         client_id: providerForm.client_id,
-        client_secret: providerForm.client_secret,
         scopes: providerForm.scopes,
         enabled: providerForm.enabled,
       };
+      if (providerForm.client_secret.trim()) {
+        payload.client_secret = providerForm.client_secret;
+      }
 
       if (existing) {
         await api.patch(`/api/v1/developers/apps/${appId}/providers/${providerForm.provider}`, payload);
@@ -272,6 +287,7 @@ export function AppDetailClient({ appId }: Props) {
   }
 
   async function rotateKeys() {
+    setConfirmLoading(true);
     try {
       const { data } = await api.post(`/api/v1/developers/apps/${appId}/rotate-keys`, { grace_period_hours: Number(gracePeriodHours) || 24 });
       toast.success(`New key ${data.new_key?.kid || 'created'}`);
@@ -279,6 +295,9 @@ export function AppDetailClient({ appId }: Props) {
       await fetchKeys();
     } catch (error) {
       if (axios.isAxiosError(error)) toast.error(error.response?.data?.error || 'Failed to rotate signing keys');
+    } finally {
+      setConfirmLoading(false);
+      setConfirmState(null);
     }
   }
 
@@ -391,6 +410,11 @@ export function AppDetailClient({ appId }: Props) {
               <label className="mb-2 block text-sm text-muted">Redirect URLs</label>
               <Textarea value={settingsForm.redirect_urls} onChange={(event) => setSettingsForm((current) => ({ ...current, redirect_urls: event.target.value }))} />
             </div>
+            <Toggle
+              checked={settingsForm.require_email_verification}
+              onChange={(require_email_verification) => setSettingsForm((current) => ({ ...current, require_email_verification }))}
+              label="Require verified email before sign-in"
+            />
             <Button loading={savingSettings} onClick={requestSaveSettings}>Confirm Changes</Button>
           </Card>
 
