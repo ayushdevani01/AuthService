@@ -33,14 +33,14 @@ func (h *AppHandler) CreateApp(ctx context.Context, req *pb.CreateAppRequest) (*
 
 	return &pb.CreateAppResponse{
 		App: &pb.App{
-			Id:           result.App.ID,
-			DeveloperId:  result.App.DeveloperID,
-			Name:         result.App.Name,
-			AppId:        result.App.AppID,
-			LogoUrl:      result.App.LogoURL,
-			RedirectUrls: result.App.RedirectURLs,
-			CreatedAt:    timestamppb.New(result.App.CreatedAt),
-			UpdatedAt:    timestamppb.New(result.App.UpdatedAt),
+			Id:                       result.App.ID,
+			DeveloperId:              result.App.DeveloperID,
+			Name:                     result.App.Name,
+			AppId:                    result.App.AppID,
+			LogoUrl:                  result.App.LogoURL,
+			RedirectUrls:             result.App.RedirectURLs,
+			CreatedAt:                timestamppb.New(result.App.CreatedAt),
+			UpdatedAt:                timestamppb.New(result.App.UpdatedAt),
 			RequireEmailVerification: result.App.RequireEmailVerification,
 		},
 		ApiKey: result.APIKey,
@@ -77,14 +77,14 @@ func (h *AppHandler) GetApp(ctx context.Context, req *pb.GetAppRequest) (*pb.Get
 
 	return &pb.GetAppResponse{
 		App: &pb.App{
-			Id:           app.ID,
-			DeveloperId:  app.DeveloperID,
-			Name:         app.Name,
-			AppId:        app.AppID,
-			LogoUrl:      app.LogoURL,
-			RedirectUrls: app.RedirectURLs,
-			CreatedAt:    timestamppb.New(app.CreatedAt),
-			UpdatedAt:    timestamppb.New(app.UpdatedAt),
+			Id:                       app.ID,
+			DeveloperId:              app.DeveloperID,
+			Name:                     app.Name,
+			AppId:                    app.AppID,
+			LogoUrl:                  app.LogoURL,
+			RedirectUrls:             app.RedirectURLs,
+			CreatedAt:                timestamppb.New(app.CreatedAt),
+			UpdatedAt:                timestamppb.New(app.UpdatedAt),
 			RequireEmailVerification: app.RequireEmailVerification,
 		},
 		Found: true,
@@ -106,14 +106,14 @@ func (h *AppHandler) GetPublicApp(ctx context.Context, req *pb.GetPublicAppReque
 
 	return &pb.GetPublicAppResponse{
 		App: &pb.App{
-			Id:           app.ID,
-			DeveloperId:  app.DeveloperID,
-			Name:         app.Name,
-			AppId:        app.AppID,
-			LogoUrl:      app.LogoURL,
-			RedirectUrls: app.RedirectURLs,
-			CreatedAt:    timestamppb.New(app.CreatedAt),
-			UpdatedAt:    timestamppb.New(app.UpdatedAt),
+			Id:                       app.ID,
+			DeveloperId:              app.DeveloperID,
+			Name:                     app.Name,
+			AppId:                    app.AppID,
+			LogoUrl:                  app.LogoURL,
+			RedirectUrls:             app.RedirectURLs,
+			CreatedAt:                timestamppb.New(app.CreatedAt),
+			UpdatedAt:                timestamppb.New(app.UpdatedAt),
 			RequireEmailVerification: app.RequireEmailVerification,
 		},
 		Found: true,
@@ -133,14 +133,14 @@ func (h *AppHandler) ListApps(ctx context.Context, req *pb.ListAppsRequest) (*pb
 	var pbApps []*pb.App
 	for _, app := range apps {
 		pbApps = append(pbApps, &pb.App{
-			Id:           app.ID,
-			DeveloperId:  app.DeveloperID,
-			Name:         app.Name,
-			AppId:        app.AppID,
-			LogoUrl:      app.LogoURL,
-			RedirectUrls: app.RedirectURLs,
-			CreatedAt:    timestamppb.New(app.CreatedAt),
-			UpdatedAt:    timestamppb.New(app.UpdatedAt),
+			Id:                       app.ID,
+			DeveloperId:              app.DeveloperID,
+			Name:                     app.Name,
+			AppId:                    app.AppID,
+			LogoUrl:                  app.LogoURL,
+			RedirectUrls:             app.RedirectURLs,
+			CreatedAt:                timestamppb.New(app.CreatedAt),
+			UpdatedAt:                timestamppb.New(app.UpdatedAt),
 			RequireEmailVerification: app.RequireEmailVerification,
 		})
 	}
@@ -153,12 +153,23 @@ func (h *AppHandler) UpdateApp(ctx context.Context, req *pb.UpdateAppRequest) (*
 		return nil, status.Error(codes.InvalidArgument, "id and developer_id are required")
 	}
 
+	// Proto3 cannot distinguish "omit redirects" from "set empty".
+	// Gateway only populates RedirectUrls when the JSON field is present.
 	var redirectURLs []string
-	if len(req.RedirectUrls) > 0 {
+	updateRedirects := req.RedirectUrls != nil
+	if updateRedirects {
 		redirectURLs = req.RedirectUrls
 	}
 
-	app, err := h.appService.UpdateApp(ctx, req.Id, req.DeveloperId, req.Name, req.LogoUrl, redirectURLs, req.RequireEmailVerification)
+	var redirectArg []string
+	if updateRedirects {
+		redirectArg = redirectURLs
+		if redirectArg == nil {
+			redirectArg = []string{}
+		}
+	}
+
+	app, err := h.appService.UpdateApp(ctx, req.Id, req.DeveloperId, req.Name, req.LogoUrl, redirectArg, req.RequireEmailVerification)
 	if err != nil {
 		if errors.Is(err, service.ErrAppNotFound) {
 			return nil, status.Error(codes.NotFound, "app not found")
@@ -171,14 +182,14 @@ func (h *AppHandler) UpdateApp(ctx context.Context, req *pb.UpdateAppRequest) (*
 
 	return &pb.UpdateAppResponse{
 		App: &pb.App{
-			Id:           app.ID,
-			DeveloperId:  app.DeveloperID,
-			Name:         app.Name,
-			AppId:        app.AppID,
-			LogoUrl:      app.LogoURL,
-			RedirectUrls: app.RedirectURLs,
-			CreatedAt:    timestamppb.New(app.CreatedAt),
-			UpdatedAt:    timestamppb.New(app.UpdatedAt),
+			Id:                       app.ID,
+			DeveloperId:              app.DeveloperID,
+			Name:                     app.Name,
+			AppId:                    app.AppID,
+			LogoUrl:                  app.LogoURL,
+			RedirectUrls:             app.RedirectURLs,
+			CreatedAt:                timestamppb.New(app.CreatedAt),
+			UpdatedAt:                timestamppb.New(app.UpdatedAt),
 			RequireEmailVerification: app.RequireEmailVerification,
 		},
 	}, nil
