@@ -141,20 +141,46 @@ func (r *SigningKeyRepository) ListByAppID(ctx context.Context, appID string, in
 }
 
 func (r *SigningKeyRepository) Rotate(ctx context.Context, appID string, gracePeriodHours int) (*SigningKey, *SigningKey, error) {
-	// Create new key first
-	newKey, err := r.Create(ctx, appID)
+	tx, err := r.db.Begin(ctx)
 	if err != nil {
 		return nil, nil, err
 	}
+	defer tx.Rollback(ctx)
 
 	now := time.Now()
 	expiresAt := now.Add(time.Duration(gracePeriodHours) * time.Hour)
 
-	_, err = r.db.Exec(ctx, `
+	_, err = tx.Exec(ctx, `
 		UPDATE signing_keys SET is_active = false, rotated_at = $2, expires_at = $3
-		WHERE app_id = $1 AND is_active = true AND id != $4
-	`, appID, now, expiresAt, newKey.ID)
+		WHERE app_id = $1 AND is_active = true
+	`, appID, now, expiresAt)
 	if err != nil {
+		return nil, nil, err
+	}
+
+	publicKey, privateKey, err := generateRSAKeyPair()
+	if err != nil {
+		return nil, nil, err
+	}
+	privateKeyEncrypted, err := auth.Encrypt(privateKey, r.encryptionKey)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	newKey := &SigningKey{}
+	err = tx.QueryRow(ctx, `
+		INSERT INTO signing_keys (app_id, kid, public_key, private_key_encrypted, is_active)
+		VALUES ($1, $2, $3, $4, true)
+		RETURNING id, app_id, kid, public_key, private_key_encrypted, is_active, created_at, expires_at, rotated_at
+	`, appID, generateKID(), publicKey, privateKeyEncrypted).Scan(
+		&newKey.ID, &newKey.AppID, &newKey.KID, &newKey.PublicKey, &newKey.PrivateKeyEncrypted,
+		&newKey.IsActive, &newKey.CreatedAt, &newKey.ExpiresAt, &newKey.RotatedAt,
+	)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	if err := tx.Commit(ctx); err != nil {
 		return nil, nil, err
 	}
 

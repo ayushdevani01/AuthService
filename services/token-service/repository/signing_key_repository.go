@@ -38,6 +38,8 @@ func (r *SigningKeyRepository) GetActiveByAppID(ctx context.Context, appID strin
 		SELECT id, app_id, kid, public_key, private_key_encrypted, is_active, created_at, expires_at, rotated_at
 		FROM signing_keys
 		WHERE app_id = $1 AND is_active = true
+		ORDER BY created_at DESC
+		LIMIT 1
 	`, appID).Scan(
 		&key.ID, &key.AppID, &key.KID, &key.PublicKey, &key.PrivateKeyEncrypted,
 		&key.IsActive, &key.CreatedAt, &key.ExpiresAt, &key.RotatedAt,
