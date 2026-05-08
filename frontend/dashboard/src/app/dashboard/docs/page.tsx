@@ -72,7 +72,7 @@ const reactSnippet = `import { AuthCallbackHandler, AuthGuard, AuthServiceProvid
 
 const nodeSnippet = `import { requireAuth } from 'authservice-node';\n\napp.get('/protected', requireAuth({\n  appId: process.env.AUTH_APP_ID,\n  audience: process.env.AUTH_AUDIENCE,\n  apiUrl: process.env.AUTH_API_URL,\n  issuer: process.env.AUTH_ISSUER,\n}), (req, res) => {\n  res.json({ user: req.auth });\n});`;
 
-const verifySnippet = `curl -X POST http://localhost:8080/api/v1/verify \\\n+  -H "Content-Type: application/json" \\\n+  -H "x-api-key: <your-api-key>" \\\n+  -H "x-app-id: <your-public-app-id>" \\\n+  -d '{\n    "token": "<jwt>",\n    "app_id": "<your-public-app-id>"\n  }'`;
+const verifySnippet = `curl -X POST http://localhost:8080/api/v1/verify \\\n  -H "Content-Type: application/json" \\\n  -H "x-api-key: <your-api-key>" \\\n  -H "x-app-id: <your-public-app-id>" \\\n  -d '{\n    "token": "<jwt>",\n    "app_id": "<your-public-app-id>"\n  }'`;
 
 export default function DashboardDocsPage() {
   return (
