@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/redis/go-redis/v9"
 )
@@ -17,7 +18,7 @@ func NewLoginRateLimiter(r *redis.Client) *LoginRateLimiter {
 }
 
 func (l *LoginRateLimiter) key(appID, email string) string {
-	return fmt.Sprintf("login_attempts:%s:%s", appID, email)
+	return fmt.Sprintf("login_attempts:%s:%s", appID, strings.ToLower(strings.TrimSpace(email)))
 }
 
 // IsBlocked returns true if this app+email combo has too many recent failures.
@@ -32,12 +33,14 @@ func (l *LoginRateLimiter) IsBlocked(ctx context.Context, appID, email string) (
 	return val >= 10, nil
 }
 
-// RecordFailure increments the failure counter. Resets TTL to 15 min on each failure.
+// RecordFailure increments the failure counter. TTL is set only when the key is created.
 func (l *LoginRateLimiter) RecordFailure(ctx context.Context, appID, email string) error {
 	k := l.key(appID, email)
 	script := `
 		local c = redis.call('INCR', KEYS[1])
-		redis.call('EXPIRE', KEYS[1], ARGV[1])
+		if c == 1 then
+			redis.call('EXPIRE', KEYS[1], ARGV[1])
+		end
 		return c
 	`
 	_, err := l.redis.Eval(ctx, script, []string{k}, 15*60).Result()
