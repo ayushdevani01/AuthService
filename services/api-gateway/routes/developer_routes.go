@@ -144,10 +144,10 @@ func (dr *DeveloperRoutes) CreateApp(c *gin.Context) {
 	developerID := c.GetString("developer_id")
 
 	var req struct {
-		Name         string   `json:"name" binding:"required"`
-		LogoURL      string   `json:"logo_url"`
-		RedirectURLs []string `json:"redirect_urls"`
-		RequireEmailVerification bool `json:"require_email_verification"`
+		Name                     string   `json:"name" binding:"required"`
+		LogoURL                  string   `json:"logo_url"`
+		RedirectURLs             []string `json:"redirect_urls"`
+		RequireEmailVerification bool     `json:"require_email_verification"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -155,10 +155,10 @@ func (dr *DeveloperRoutes) CreateApp(c *gin.Context) {
 	}
 
 	resp, err := dr.client.CreateApp(c.Request.Context(), &pb.CreateAppRequest{
-		DeveloperId:  developerID,
-		Name:         req.Name,
-		LogoUrl:      req.LogoURL,
-		RedirectUrls: req.RedirectURLs,
+		DeveloperId:              developerID,
+		Name:                     req.Name,
+		LogoUrl:                  req.LogoURL,
+		RedirectUrls:             req.RedirectURLs,
 		RequireEmailVerification: req.RequireEmailVerification,
 	})
 	if err != nil {
@@ -171,12 +171,12 @@ func (dr *DeveloperRoutes) CreateApp(c *gin.Context) {
 		"api_key":     resp.ApiKey,
 		"signing_key": formatSigningKey(resp.SigningKey),
 		"integration": gin.H{
-			"public_app_id":      resp.App.AppId,
-			"audience_app_id":    resp.App.Id,
-			"verify_api_key":     resp.ApiKey,
-			"jwks_url":           "/api/v1/apps/" + resp.App.AppId + "/jwks",
-			"verify_endpoint":    "/api/v1/verify",
-			"userinfo_endpoint":  "/api/v1/userinfo",
+			"public_app_id":     resp.App.AppId,
+			"audience_app_id":   resp.App.Id,
+			"verify_api_key":    resp.ApiKey,
+			"jwks_url":          "/api/v1/apps/" + resp.App.AppId + "/jwks",
+			"verify_endpoint":   "/api/v1/verify",
+			"userinfo_endpoint": "/api/v1/userinfo",
 			"notes": []string{
 				"Use public_app_id for JWKS lookup and public API headers like x-app-id.",
 				"Use audience_app_id as the expected JWT aud claim value.",
@@ -235,10 +235,10 @@ func (dr *DeveloperRoutes) UpdateApp(c *gin.Context) {
 	appID := c.Param("id")
 
 	var req struct {
-		Name         *string  `json:"name"`
-		LogoURL      *string  `json:"logo_url"`
-		RedirectURLs []string `json:"redirect_urls"`
-		RequireEmailVerification *bool `json:"require_email_verification"`
+		Name                     *string   `json:"name"`
+		LogoURL                  *string   `json:"logo_url"`
+		RedirectURLs             *[]string `json:"redirect_urls"`
+		RequireEmailVerification *bool     `json:"require_email_verification"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -246,15 +246,20 @@ func (dr *DeveloperRoutes) UpdateApp(c *gin.Context) {
 	}
 
 	grpcReq := &pb.UpdateAppRequest{
-		Id:           appID,
-		DeveloperId:  developerID,
-		RedirectUrls: req.RedirectURLs,
+		Id:          appID,
+		DeveloperId: developerID,
 	}
 	if req.Name != nil {
 		grpcReq.Name = req.Name
 	}
 	if req.LogoURL != nil {
 		grpcReq.LogoUrl = req.LogoURL
+	}
+	if req.RedirectURLs != nil {
+		grpcReq.RedirectUrls = *req.RedirectURLs
+		if grpcReq.RedirectUrls == nil {
+			grpcReq.RedirectUrls = []string{}
+		}
 	}
 	if req.RequireEmailVerification != nil {
 		grpcReq.RequireEmailVerification = req.RequireEmailVerification
@@ -374,6 +379,7 @@ func (dr *DeveloperRoutes) AddOAuthProvider(c *gin.Context) {
 		ClientID     string   `json:"client_id" binding:"required"`
 		ClientSecret string   `json:"client_secret" binding:"required"`
 		Scopes       []string `json:"scopes"`
+		Enabled      *bool    `json:"enabled"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -393,7 +399,23 @@ func (dr *DeveloperRoutes) AddOAuthProvider(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusCreated, gin.H{"provider": formatOAuthProvider(resp.Provider)})
+	provider := resp.Provider
+	if req.Enabled != nil && !*req.Enabled {
+		updated, updateErr := dr.client.UpdateOAuthProvider(c.Request.Context(), &pb.UpdateOAuthProviderRequest{
+			AppId:       appID,
+			DeveloperId: developerID,
+			Provider:    req.Provider,
+			Enabled:     req.Enabled,
+			Scopes:      req.Scopes,
+		})
+		if updateErr != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": updateErr.Error()})
+			return
+		}
+		provider = updated.Provider
+	}
+
+	c.JSON(http.StatusCreated, gin.H{"provider": formatOAuthProvider(provider)})
 }
 
 func (dr *DeveloperRoutes) ListOAuthProviders(c *gin.Context) {
@@ -486,21 +508,21 @@ func formatApp(a *pb.App) gin.H {
 		return nil
 	}
 	return gin.H{
-		"id":            a.Id,
-		"app_id":        a.AppId,
-		"public_app_id": a.AppId,
+		"id":              a.Id,
+		"app_id":          a.AppId,
+		"public_app_id":   a.AppId,
 		"audience_app_id": a.Id,
 		"identifier_usage": gin.H{
 			"public_app_id":   "Use for JWKS lookup and public API requests.",
 			"audience_app_id": "Use as the expected JWT aud claim value.",
 		},
-		"developer_id":  a.DeveloperId,
-		"name":          a.Name,
-		"logo_url":      a.LogoUrl,
-		"redirect_urls": a.RedirectUrls,
+		"developer_id":               a.DeveloperId,
+		"name":                       a.Name,
+		"logo_url":                   a.LogoUrl,
+		"redirect_urls":              a.RedirectUrls,
 		"require_email_verification": a.RequireEmailVerification,
-		"created_at":    formatTimestamp(a.CreatedAt),
-		"updated_at":    formatTimestamp(a.UpdatedAt),
+		"created_at":                 formatTimestamp(a.CreatedAt),
+		"updated_at":                 formatTimestamp(a.UpdatedAt),
 	}
 }
 

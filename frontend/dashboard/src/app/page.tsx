@@ -47,7 +47,7 @@ const codeTabs = {
   env: `AUTH_APP_ID=app_your_public_app_id\nAUTH_AUDIENCE=your-internal-app-uuid\nAUTH_API_URL=http://localhost:8080\nAUTH_ISSUER=https://auth.yourplatform.com`,
   react: `import { AuthCallbackHandler, AuthGuard, AuthServiceProvider, useAuth } from 'authservice-react';\n\nfunction LoginButton() {\n  const { login } = useAuth();\n  return <button onClick={() => login()}>Sign in</button>;\n}\n\nexport default function App() {\n  return (\n    <AuthServiceProvider\n      appId={process.env.NEXT_PUBLIC_AUTH_APP_ID!}\n      authUrl={process.env.NEXT_PUBLIC_AUTH_URL!}\n      redirectUri={process.env.NEXT_PUBLIC_AUTH_REDIRECT_URI!}\n    >\n      <AuthCallbackHandler />\n      <AuthGuard fallback={<LoginButton />}>\n        <div>Protected app content</div>\n      </AuthGuard>\n    </AuthServiceProvider>\n  );\n}`,
   node: `import { requireAuth } from 'authservice-node';\n\napp.get('/protected', requireAuth({\n  appId: process.env.AUTH_APP_ID,\n  audience: process.env.AUTH_AUDIENCE,\n  apiUrl: process.env.AUTH_API_URL,\n  issuer: process.env.AUTH_ISSUER,\n}), (req, res) => {\n  res.json({ user: req.auth });\n});`,
-  curl: `curl -X POST http://localhost:8080/api/v1/verify \\\n+  -H "Content-Type: application/json" \\\n+  -H "x-api-key: <your-api-key>" \\\n+  -H "x-app-id: <your-public-app-id>" \\\n+  -d '{\n    "token": "<jwt>",\n    "app_id": "<your-public-app-id>"\n  }'`,
+  curl: `curl -X POST http://localhost:8080/api/v1/verify \\\n  -H "Content-Type: application/json" \\\n  -H "x-api-key: <your-api-key>" \\\n  -H "x-app-id: <your-public-app-id>" \\\n  -d '{\n    "token": "<jwt>",\n    "app_id": "<your-public-app-id>"\n  }'`,
 };
 
 const docSections = [
