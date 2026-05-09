@@ -616,6 +616,7 @@ type App struct {
 	CreatedAt                *timestamppb.Timestamp `protobuf:"bytes,7,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
 	UpdatedAt                *timestamppb.Timestamp `protobuf:"bytes,8,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
 	RequireEmailVerification bool                   `protobuf:"varint,9,opt,name=require_email_verification,json=requireEmailVerification,proto3" json:"require_email_verification,omitempty"`
+	EmailAuthEnabled         bool                   `protobuf:"varint,10,opt,name=email_auth_enabled,json=emailAuthEnabled,proto3" json:"email_auth_enabled,omitempty"`
 	unknownFields            protoimpl.UnknownFields
 	sizeCache                protoimpl.SizeCache
 }
@@ -709,6 +710,13 @@ func (x *App) GetUpdatedAt() *timestamppb.Timestamp {
 func (x *App) GetRequireEmailVerification() bool {
 	if x != nil {
 		return x.RequireEmailVerification
+	}
+	return false
+}
+
+func (x *App) GetEmailAuthEnabled() bool {
+	if x != nil {
+		return x.EmailAuthEnabled
 	}
 	return false
 }
@@ -1138,6 +1146,7 @@ type UpdateAppRequest struct {
 	LogoUrl                  *string                `protobuf:"bytes,4,opt,name=logo_url,json=logoUrl,proto3,oneof" json:"logo_url,omitempty"`
 	RedirectUrls             []string               `protobuf:"bytes,5,rep,name=redirect_urls,json=redirectUrls,proto3" json:"redirect_urls,omitempty"`
 	RequireEmailVerification *bool                  `protobuf:"varint,6,opt,name=require_email_verification,json=requireEmailVerification,proto3,oneof" json:"require_email_verification,omitempty"`
+	EmailAuthEnabled         *bool                  `protobuf:"varint,7,opt,name=email_auth_enabled,json=emailAuthEnabled,proto3,oneof" json:"email_auth_enabled,omitempty"`
 	unknownFields            protoimpl.UnknownFields
 	sizeCache                protoimpl.SizeCache
 }
@@ -1210,6 +1219,13 @@ func (x *UpdateAppRequest) GetRedirectUrls() []string {
 func (x *UpdateAppRequest) GetRequireEmailVerification() bool {
 	if x != nil && x.RequireEmailVerification != nil {
 		return *x.RequireEmailVerification
+	}
+	return false
+}
+
+func (x *UpdateAppRequest) GetEmailAuthEnabled() bool {
+	if x != nil && x.EmailAuthEnabled != nil {
+		return *x.EmailAuthEnabled
 	}
 	return false
 }
@@ -2680,7 +2696,7 @@ const file_proto_developer_developer_proto_rawDesc = "" +
 	"\x05_nameB\v\n" +
 	"\t_password\"K\n" +
 	"\x15UpdateProfileResponse\x122\n" +
-	"\tdeveloper\x18\x01 \x01(\v2\x14.developer.DeveloperR\tdeveloper\"\xd7\x02\n" +
+	"\tdeveloper\x18\x01 \x01(\v2\x14.developer.DeveloperR\tdeveloper\"\x85\x03\n" +
 	"\x03App\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12!\n" +
 	"\fdeveloper_id\x18\x02 \x01(\tR\vdeveloperId\x12\x12\n" +
@@ -2692,7 +2708,9 @@ const file_proto_developer_developer_proto_rawDesc = "" +
 	"created_at\x18\a \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x129\n" +
 	"\n" +
 	"updated_at\x18\b \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\x12<\n" +
-	"\x1arequire_email_verification\x18\t \x01(\bR\x18requireEmailVerification\"\xc7\x01\n" +
+	"\x1arequire_email_verification\x18\t \x01(\bR\x18requireEmailVerification\x12,\n" +
+	"\x12email_auth_enabled\x18\n" +
+	" \x01(\bR\x10emailAuthEnabled\"\xc7\x01\n" +
 	"\x10CreateAppRequest\x12!\n" +
 	"\fdeveloper_id\x18\x01 \x01(\tR\vdeveloperId\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12\x19\n" +
@@ -2717,17 +2735,19 @@ const file_proto_developer_developer_proto_rawDesc = "" +
 	"\x0fListAppsRequest\x12!\n" +
 	"\fdeveloper_id\x18\x01 \x01(\tR\vdeveloperId\"6\n" +
 	"\x10ListAppsResponse\x12\"\n" +
-	"\x04apps\x18\x01 \x03(\v2\x0e.developer.AppR\x04apps\"\x9b\x02\n" +
+	"\x04apps\x18\x01 \x03(\v2\x0e.developer.AppR\x04apps\"\xe5\x02\n" +
 	"\x10UpdateAppRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12!\n" +
 	"\fdeveloper_id\x18\x02 \x01(\tR\vdeveloperId\x12\x17\n" +
 	"\x04name\x18\x03 \x01(\tH\x00R\x04name\x88\x01\x01\x12\x1e\n" +
 	"\blogo_url\x18\x04 \x01(\tH\x01R\alogoUrl\x88\x01\x01\x12#\n" +
 	"\rredirect_urls\x18\x05 \x03(\tR\fredirectUrls\x12A\n" +
-	"\x1arequire_email_verification\x18\x06 \x01(\bH\x02R\x18requireEmailVerification\x88\x01\x01B\a\n" +
+	"\x1arequire_email_verification\x18\x06 \x01(\bH\x02R\x18requireEmailVerification\x88\x01\x01\x121\n" +
+	"\x12email_auth_enabled\x18\a \x01(\bH\x03R\x10emailAuthEnabled\x88\x01\x01B\a\n" +
 	"\x05_nameB\v\n" +
 	"\t_logo_urlB\x1d\n" +
-	"\x1b_require_email_verification\"5\n" +
+	"\x1b_require_email_verificationB\x15\n" +
+	"\x13_email_auth_enabled\"5\n" +
 	"\x11UpdateAppResponse\x12 \n" +
 	"\x03app\x18\x01 \x01(\v2\x0e.developer.AppR\x03app\"E\n" +
 	"\x10DeleteAppRequest\x12\x0e\n" +

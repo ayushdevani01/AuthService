@@ -111,6 +111,7 @@ message App {
   google.protobuf.Timestamp created_at = 7;
   google.protobuf.Timestamp updated_at = 8;
   bool require_email_verification = 9;
+  bool email_auth_enabled = 10;
 }
 
 // App Management
@@ -153,6 +154,7 @@ message UpdateAppRequest {
   optional string logo_url = 4;
   repeated string redirect_urls = 5;
   optional bool require_email_verification = 6;
+  optional bool email_auth_enabled = 7;
 }
 
 message UpdateAppResponse { App app = 1; }

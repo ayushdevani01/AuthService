@@ -1,0 +1,2 @@
+ALTER TABLE apps
+ADD COLUMN email_auth_enabled BOOLEAN NOT NULL DEFAULT true;
