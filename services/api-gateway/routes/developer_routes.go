@@ -4,6 +4,7 @@ import (
 	"io"
 	"net/http"
 	"strconv"
+	"strings"
 
 	pb "github.com/ayushdevan01/AuthService/proto/developer"
 	pbUser "github.com/ayushdevan01/AuthService/proto/user"
@@ -239,6 +240,7 @@ func (dr *DeveloperRoutes) UpdateApp(c *gin.Context) {
 		LogoURL                  *string   `json:"logo_url"`
 		RedirectURLs             *[]string `json:"redirect_urls"`
 		RequireEmailVerification *bool     `json:"require_email_verification"`
+		EmailAuthEnabled         *bool     `json:"email_auth_enabled"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -264,9 +266,16 @@ func (dr *DeveloperRoutes) UpdateApp(c *gin.Context) {
 	if req.RequireEmailVerification != nil {
 		grpcReq.RequireEmailVerification = req.RequireEmailVerification
 	}
+	if req.EmailAuthEnabled != nil {
+		grpcReq.EmailAuthEnabled = req.EmailAuthEnabled
+	}
 
 	resp, err := dr.client.UpdateApp(c.Request.Context(), grpcReq)
 	if err != nil {
+		if strings.Contains(err.Error(), "at_least_one_auth_method_required") {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "at_least_one_auth_method_required"})
+			return
+		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
@@ -464,6 +473,10 @@ func (dr *DeveloperRoutes) UpdateOAuthProvider(c *gin.Context) {
 		Enabled:      req.Enabled,
 	})
 	if err != nil {
+		if strings.Contains(err.Error(), "at_least_one_auth_method_required") {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "at_least_one_auth_method_required"})
+			return
+		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
@@ -481,6 +494,10 @@ func (dr *DeveloperRoutes) DeleteOAuthProvider(c *gin.Context) {
 		Provider:    provider,
 	})
 	if err != nil {
+		if strings.Contains(err.Error(), "at_least_one_auth_method_required") {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "at_least_one_auth_method_required"})
+			return
+		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
@@ -521,6 +538,7 @@ func formatApp(a *pb.App) gin.H {
 		"logo_url":                   a.LogoUrl,
 		"redirect_urls":              a.RedirectUrls,
 		"require_email_verification": a.RequireEmailVerification,
+		"email_auth_enabled":         a.EmailAuthEnabled,
 		"created_at":                 formatTimestamp(a.CreatedAt),
 		"updated_at":                 formatTimestamp(a.UpdatedAt),
 	}

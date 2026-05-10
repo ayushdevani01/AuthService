@@ -122,6 +122,9 @@ func (h *OAuthProviderHandler) UpdateOAuthProvider(ctx context.Context, req *pb.
 		if errors.Is(err, service.ErrNotAppOwner) {
 			return nil, status.Error(codes.PermissionDenied, "not the owner of this app")
 		}
+		if errors.Is(err, service.ErrAtLeastOneAuthMethod) {
+			return nil, status.Error(codes.InvalidArgument, "at_least_one_auth_method_required")
+		}
 		return nil, status.Error(codes.Internal, "failed to update oauth provider")
 	}
 
@@ -150,6 +153,9 @@ func (h *OAuthProviderHandler) DeleteOAuthProvider(ctx context.Context, req *pb.
 		}
 		if errors.Is(err, service.ErrNotAppOwner) {
 			return nil, status.Error(codes.PermissionDenied, "not the owner of this app")
+		}
+		if errors.Is(err, service.ErrAtLeastOneAuthMethod) {
+			return nil, status.Error(codes.InvalidArgument, "at_least_one_auth_method_required")
 		}
 		return nil, status.Error(codes.Internal, "failed to delete oauth provider")
 	}

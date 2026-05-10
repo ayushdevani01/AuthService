@@ -10,9 +10,10 @@ import (
 )
 
 var (
-	ErrAppNotFound      = errors.New("app not found")
-	ErrNotAppOwner      = errors.New("not the owner of this app")
-	ErrProviderNotFound = errors.New("oauth provider not found")
+	ErrAppNotFound           = errors.New("app not found")
+	ErrNotAppOwner           = errors.New("not the owner of this app")
+	ErrProviderNotFound      = errors.New("oauth provider not found")
+	ErrAtLeastOneAuthMethod  = errors.New("at_least_one_auth_method_required")
 )
 
 type AppService struct {
@@ -70,7 +71,7 @@ func (s *AppService) ListApps(ctx context.Context, developerID string) ([]*repos
 	return s.appRepo.ListByDeveloper(ctx, developerID)
 }
 
-func (s *AppService) UpdateApp(ctx context.Context, appID, developerID string, name, logoURL *string, redirectURLs []string, requireEmailVerification *bool) (*repository.App, error) {
+func (s *AppService) UpdateApp(ctx context.Context, appID, developerID string, name, logoURL *string, redirectURLs []string, requireEmailVerification, emailAuthEnabled *bool) (*repository.App, error) {
 	app, err := s.appRepo.FindByID(ctx, appID)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -94,6 +95,26 @@ func (s *AppService) UpdateApp(ctx context.Context, appID, developerID string, n
 	}
 	if requireEmailVerification != nil {
 		app.RequireEmailVerification = *requireEmailVerification
+	}
+	if emailAuthEnabled != nil {
+		app.EmailAuthEnabled = *emailAuthEnabled
+	}
+
+	if !app.EmailAuthEnabled {
+		providers, listErr := s.oauthRepo.ListByAppID(ctx, app.ID)
+		if listErr != nil {
+			return nil, listErr
+		}
+		hasEnabledSocial := false
+		for _, provider := range providers {
+			if provider.Enabled {
+				hasEnabledSocial = true
+				break
+			}
+		}
+		if !hasEnabledSocial {
+			return nil, ErrAtLeastOneAuthMethod
+		}
 	}
 
 	return s.appRepo.Update(ctx, app)
@@ -280,6 +301,16 @@ func (s *AppService) UpdateOAuthProvider(ctx context.Context, appID, developerID
 		return nil, ErrNotAppOwner
 	}
 
+	if enabled != nil && !*enabled {
+		ok, checkErr := s.hasOtherAuthMethod(ctx, app, provider)
+		if checkErr != nil {
+			return nil, checkErr
+		}
+		if !ok {
+			return nil, ErrAtLeastOneAuthMethod
+		}
+	}
+
 	var encryptedSecret *string
 	if clientSecret != nil {
 		encrypted, err := auth.Encrypt(*clientSecret, s.encryptionKey)
@@ -305,5 +336,32 @@ func (s *AppService) DeleteOAuthProvider(ctx context.Context, appID, developerID
 		return ErrNotAppOwner
 	}
 
+	ok, checkErr := s.hasOtherAuthMethod(ctx, app, provider)
+	if checkErr != nil {
+		return checkErr
+	}
+	if !ok {
+		return ErrAtLeastOneAuthMethod
+	}
+
 	return s.oauthRepo.Delete(ctx, app.ID, provider)
+}
+
+// hasOtherAuthMethod reports whether the app would still have an auth method
+// if the given OAuth provider were disabled or removed.
+func (s *AppService) hasOtherAuthMethod(ctx context.Context, app *repository.App, skipProvider string) (bool, error) {
+	if app.EmailAuthEnabled {
+		return true, nil
+	}
+	providers, err := s.oauthRepo.ListByAppID(ctx, app.ID)
+	if err != nil {
+		return false, err
+	}
+	for _, provider := range providers {
+		if provider.Provider == skipProvider || !provider.Enabled {
+			continue
+		}
+		return true, nil
+	}
+	return false, nil
 }
