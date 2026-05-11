@@ -49,7 +49,7 @@ export function AppDetailClient({ appId }: Props) {
   const [app, setApp] = useState<AppRecord | null>(null);
   const [activeTab, setActiveTab] = useState<TabKey>('overview');
   const [loading, setLoading] = useState(true);
-  const [settingsForm, setSettingsForm] = useState({ name: '', redirect_urls: '', require_email_verification: false });
+  const [settingsForm, setSettingsForm] = useState({ name: '', redirect_urls: '', require_email_verification: false, email_auth_enabled: true });
   const [savingSettings, setSavingSettings] = useState(false);
   const [providers, setProviders] = useState<OAuthProvider[]>([]);
   const [providerForm, setProviderForm] = useState<{ provider: 'google' | 'github'; client_id: string; client_secret: string; scopes: string[]; enabled: boolean }>({
@@ -93,6 +93,7 @@ export function AppDetailClient({ appId }: Props) {
         name: data.app.name || '',
         redirect_urls: (data.app.redirect_urls || []).join('\n'),
         require_email_verification: Boolean(data.app.require_email_verification),
+        email_auth_enabled: data.app.email_auth_enabled !== false,
       });
     } catch (error) {
       if (axios.isAxiosError(error)) toast.error(error.response?.data?.error || 'Failed to load app');
@@ -153,16 +154,25 @@ export function AppDetailClient({ appId }: Props) {
       if (settingsForm.require_email_verification !== Boolean(app.require_email_verification)) {
         payload.require_email_verification = settingsForm.require_email_verification;
       }
+      if (settingsForm.email_auth_enabled !== (app.email_auth_enabled !== false)) {
+        payload.email_auth_enabled = settingsForm.email_auth_enabled;
+      }
       const { data } = await api.patch(`/api/v1/developers/apps/${appId}`, payload);
       setApp(data.app);
       setSettingsForm({
         name: data.app.name || '',
         redirect_urls: (data.app.redirect_urls || []).join('\n'),
         require_email_verification: Boolean(data.app.require_email_verification),
+        email_auth_enabled: data.app.email_auth_enabled !== false,
       });
       toast.success('App updated');
     } catch (error) {
-      if (axios.isAxiosError(error)) toast.error(error.response?.data?.error || 'Failed to update app');
+      if (axios.isAxiosError(error)) {
+        const code = error.response?.data?.error;
+        toast.error(code === 'at_least_one_auth_method_required'
+          ? 'Keep at least one sign-in method enabled (email or an OAuth provider).'
+          : (code || 'Failed to update app'));
+      }
     } finally {
       setSavingSettings(false);
       setConfirmState(null);
@@ -238,13 +248,22 @@ export function AppDetailClient({ appId }: Props) {
     }
   }
 
+  function authMethodError(error: unknown, fallback: string) {
+    if (!axios.isAxiosError(error)) return fallback;
+    const code = error.response?.data?.error;
+    if (code === 'at_least_one_auth_method_required') {
+      return 'Keep at least one sign-in method enabled (email or an OAuth provider).';
+    }
+    return code || fallback;
+  }
+
   async function toggleProvider(provider: OAuthProvider) {
     try {
       await api.patch(`/api/v1/developers/apps/${appId}/providers/${provider.provider}`, { enabled: !provider.enabled, scopes: provider.scopes });
       toast.success('Provider updated');
       await fetchProviders();
     } catch (error) {
-      if (axios.isAxiosError(error)) toast.error(error.response?.data?.error || 'Failed to update provider');
+      toast.error(authMethodError(error, 'Failed to update provider'));
     }
   }
 
@@ -255,7 +274,7 @@ export function AppDetailClient({ appId }: Props) {
       toast.success('Provider deleted');
       await fetchProviders();
     } catch (error) {
-      if (axios.isAxiosError(error)) toast.error(error.response?.data?.error || 'Failed to delete provider');
+      toast.error(authMethodError(error, 'Failed to delete provider'));
     } finally {
       setConfirmLoading(false);
       setConfirmState(null);
@@ -410,6 +429,11 @@ export function AppDetailClient({ appId }: Props) {
               <label className="mb-2 block text-sm text-muted">Redirect URLs</label>
               <Textarea value={settingsForm.redirect_urls} onChange={(event) => setSettingsForm((current) => ({ ...current, redirect_urls: event.target.value }))} />
             </div>
+            <Toggle
+              checked={settingsForm.email_auth_enabled}
+              onChange={(email_auth_enabled) => setSettingsForm((current) => ({ ...current, email_auth_enabled }))}
+              label="Allow email and password sign-in"
+            />
             <Toggle
               checked={settingsForm.require_email_verification}
               onChange={(require_email_verification) => setSettingsForm((current) => ({ ...current, require_email_verification }))}
