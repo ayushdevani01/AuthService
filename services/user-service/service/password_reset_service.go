@@ -78,6 +78,11 @@ func (s *PasswordResetService) InitiateReset(ctx context.Context, appID, email, 
 }
 
 func (s *PasswordResetService) ResetPassword(ctx context.Context, appID, rawToken, newPassword string) error {
+	newPassword = NormalizePassword(newPassword)
+	if err := ValidatePasswordLength(newPassword); err != nil {
+		return err
+	}
+
 	tokenHash := hashResetToken(rawToken)
 
 	record, err := s.resetRepo.FindValidToken(ctx, tokenHash, appID)

@@ -187,6 +187,11 @@ func (s *UserService) ListUsers(ctx context.Context, appID string, pageSize int,
 }
 
 func (s *UserService) RegisterWithEmail(ctx context.Context, appID, email, password, name string) (*repository.User, error) {
+	password = NormalizePassword(password)
+	if err := ValidatePasswordLength(password); err != nil {
+		return nil, err
+	}
+
 	existing, err := s.userRepo.FindByEmail(ctx, appID, email)
 	if err == nil && existing != nil {
 		return nil, ErrUserExists
