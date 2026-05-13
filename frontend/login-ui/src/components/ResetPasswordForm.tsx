@@ -19,12 +19,31 @@ export function ResetPasswordForm({ appId, token, redirectUri }: { appId: string
       toast.error('Passwords do not match');
       return;
     }
+    if (password.length < 8) {
+      toast.error('Password must be at least 8 characters');
+      return;
+    }
+    if (password.length > 72) {
+      toast.error('Password must be at most 72 characters');
+      return;
+    }
     setLoading(true);
     try {
-      await api.post('/auth/reset-password', { app_id: appId, token, new_password: password });
+      await api.post('/auth/reset-password', {
+        app_id: appId,
+        token,
+        new_password: password,
+        confirm_password: confirmPassword,
+      });
       setDone(true);
     } catch (error) {
-      if (axios.isAxiosError(error)) toast.error(error.response?.data?.error || 'Unable to reset password');
+      if (axios.isAxiosError(error)) {
+        const code = error.response?.data?.error;
+        if (code === 'password_too_short') toast.error('Password must be at least 8 characters');
+        else if (code === 'password_too_long') toast.error('Password must be at most 72 characters');
+        else if (code === 'password_mismatch') toast.error('Passwords do not match');
+        else toast.error(code || 'Unable to reset password');
+      }
     } finally {
       setLoading(false);
     }
@@ -45,8 +64,8 @@ export function ResetPasswordForm({ appId, token, redirectUri }: { appId: string
 
   return (
     <form className="space-y-4" onSubmit={handleSubmit}>
-      <Input type="password" placeholder="New password" required value={password} onChange={(event) => setPassword(event.target.value)} />
-      <Input type="password" placeholder="Confirm password" required value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} />
+      <Input type="password" placeholder="New password" required minLength={8} maxLength={72} value={password} onChange={(event) => setPassword(event.target.value)} />
+      <Input type="password" placeholder="Confirm password" required minLength={8} maxLength={72} value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} />
       <Button type="submit" className="w-full justify-center" loading={loading}>Reset Password</Button>
     </form>
   );

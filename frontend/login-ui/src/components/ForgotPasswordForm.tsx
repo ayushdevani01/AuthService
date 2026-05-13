@@ -23,7 +23,10 @@ export function ForgotPasswordForm({ appId, redirectUri }: { appId: string; redi
       });
       setMessage(data.message);
     } catch (error) {
-      if (axios.isAxiosError(error)) toast.error(error.response?.data?.error || 'Unable to send reset link');
+      if (axios.isAxiosError(error)) {
+        const code = error.response?.data?.error;
+        toast.error(code === 'rate_limited' ? 'Too many attempts. Try again later.' : (code || 'Unable to send reset link'));
+      }
     } finally {
       setLoading(false);
     }

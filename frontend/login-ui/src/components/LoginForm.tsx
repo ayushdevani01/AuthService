@@ -6,12 +6,27 @@ import { useState } from 'react';
 import toast from 'react-hot-toast';
 import { api } from '@/lib/api';
 import { Button, Input } from '@/components/ui';
+import type { AuthMethods } from '@/lib/types';
 
-export function LoginForm({ appId, redirectUri }: { appId: string; redirectUri: string }) {
+export function LoginForm({
+  appId,
+  redirectUri,
+  authMethods,
+}: {
+  appId: string;
+  redirectUri: string;
+  authMethods: AuthMethods;
+}) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [oauthLoading, setOauthLoading] = useState<string | null>(null);
+
+  const showEmail = authMethods.email;
+  const showGoogle = authMethods.google;
+  const showGithub = authMethods.github;
+  const showSocial = showGoogle || showGithub;
+  const showDivider = showEmail && showSocial;
 
   async function handleEmailLogin(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -54,22 +69,53 @@ export function LoginForm({ appId, redirectUri }: { appId: string; redirectUri: 
     }
   }
 
+  if (!showEmail && !showSocial) {
+    return <p className="text-sm" style={{ color: 'var(--muted)' }}>No sign-in methods are enabled for this application.</p>;
+  }
+
   return (
     <div className="space-y-6">
-      <div className="grid gap-3">
-        <Button variant="secondary" onClick={() => handleOAuth('google')} loading={oauthLoading === 'google'} className="w-full justify-center">Continue with Google</Button>
-        <Button variant="secondary" onClick={() => handleOAuth('github')} loading={oauthLoading === 'github'} className="w-full justify-center">Continue with GitHub</Button>
-      </div>
-      <div className="flex items-center gap-3 text-xs uppercase tracking-[0.35em]" style={{ color: 'var(--muted)' }}><span className="h-px flex-1" style={{ background: 'var(--border)' }} />or<span className="h-px flex-1" style={{ background: 'var(--border)' }} /></div>
-      <form className="space-y-4" onSubmit={handleEmailLogin}>
-        <Input type="email" placeholder="Email" required value={email} onChange={(event) => setEmail(event.target.value)} />
-        <Input type="password" placeholder="Password" required value={password} onChange={(event) => setPassword(event.target.value)} />
-        <Button type="submit" className="w-full justify-center" loading={loading}>Sign In</Button>
-      </form>
-      <div className="flex items-center justify-between text-sm" style={{ color: 'var(--muted)' }}>
-        <Link href={`/?app_id=${encodeURIComponent(appId)}&redirect_uri=${encodeURIComponent(redirectUri)}&mode=register`} className="underline underline-offset-4" style={{ color: 'var(--foreground)' }}>Create account</Link>
-        <Link href={`/?app_id=${encodeURIComponent(appId)}&redirect_uri=${encodeURIComponent(redirectUri)}&mode=forgot`} className="underline underline-offset-4" style={{ color: 'var(--foreground)' }}>Forgot password</Link>
-      </div>
+      {showSocial ? (
+        <div className="grid gap-3">
+          {showGoogle ? (
+            <Button variant="secondary" onClick={() => handleOAuth('google')} loading={oauthLoading === 'google'} className="w-full justify-center">
+              Continue with Google
+            </Button>
+          ) : null}
+          {showGithub ? (
+            <Button variant="secondary" onClick={() => handleOAuth('github')} loading={oauthLoading === 'github'} className="w-full justify-center">
+              Continue with GitHub
+            </Button>
+          ) : null}
+        </div>
+      ) : null}
+
+      {showDivider ? (
+        <div className="flex items-center gap-3 text-xs uppercase tracking-[0.35em]" style={{ color: 'var(--muted)' }}>
+          <span className="h-px flex-1" style={{ background: 'var(--border)' }} />
+          or
+          <span className="h-px flex-1" style={{ background: 'var(--border)' }} />
+        </div>
+      ) : null}
+
+      {showEmail ? (
+        <form className="space-y-4" onSubmit={handleEmailLogin}>
+          <Input type="email" placeholder="Email" required value={email} onChange={(event) => setEmail(event.target.value)} />
+          <Input type="password" placeholder="Password" required value={password} onChange={(event) => setPassword(event.target.value)} />
+          <Button type="submit" className="w-full justify-center" loading={loading}>Sign In</Button>
+        </form>
+      ) : null}
+
+      {showEmail ? (
+        <div className="flex items-center justify-between text-sm" style={{ color: 'var(--muted)' }}>
+          <Link href={`/?app_id=${encodeURIComponent(appId)}&redirect_uri=${encodeURIComponent(redirectUri)}&mode=register`} className="underline underline-offset-4" style={{ color: 'var(--foreground)' }}>
+            Create account
+          </Link>
+          <Link href={`/?app_id=${encodeURIComponent(appId)}&redirect_uri=${encodeURIComponent(redirectUri)}&mode=forgot`} className="underline underline-offset-4" style={{ color: 'var(--foreground)' }}>
+            Forgot password
+          </Link>
+        </div>
+      ) : null}
     </div>
   );
 }
