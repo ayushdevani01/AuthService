@@ -181,6 +181,9 @@ func (h *UserHandler) RegisterWithEmail(ctx context.Context, req *pb.RegisterWit
 		if errors.Is(err, service.ErrUserExists) {
 			return nil, status.Errorf(codes.AlreadyExists, "user already exists with this email")
 		}
+		if errors.Is(err, service.ErrPasswordTooShort) || errors.Is(err, service.ErrPasswordTooLong) {
+			return nil, status.Error(codes.InvalidArgument, err.Error())
+		}
 		return nil, status.Errorf(codes.Internal, "registration failed: %v", err)
 	}
 
@@ -252,6 +255,8 @@ func (h *UserHandler) ResetPassword(ctx context.Context, req *pb.ResetPasswordRe
 			return &pb.ResetPasswordResponse{Success: false, ErrorMessage: "reset token already used"}, nil
 		case errors.Is(err, service.ErrNoPasswordIdentity):
 			return &pb.ResetPasswordResponse{Success: false, ErrorMessage: "no_password_identity"}, nil
+		case errors.Is(err, service.ErrPasswordTooShort), errors.Is(err, service.ErrPasswordTooLong):
+			return &pb.ResetPasswordResponse{Success: false, ErrorMessage: err.Error()}, nil
 		default:
 			return nil, status.Errorf(codes.Internal, "password reset failed: %v", err)
 		}

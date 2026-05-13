@@ -52,10 +52,11 @@ func main() {
 
 	// App resolver for app_id to UUID resolution
 	appResolver := middleware.NewAppResolver(redisClient, devClient)
+	authRateLimiter := middleware.NewAuthRateLimiter(redisClient)
 
 	// Route handlers
 	devRoutes := routes.NewDeveloperRoutes(devClient, userClient)
-	authRoutes := routes.NewAuthRoutes(devClient, userClient, tokenClient, appResolver, cfg.Issuer)
+	authRoutes := routes.NewAuthRoutes(devClient, userClient, tokenClient, appResolver, authRateLimiter, cfg.Issuer)
 
 	r := gin.Default()
 	if err := r.SetTrustedProxies(nil); err != nil {
@@ -122,6 +123,7 @@ func main() {
 	// Public API routes
 	api := r.Group("/api/v1")
 	{
+		api.GET("/public/apps/:app_id", authRoutes.PublicApp)
 		api.GET("/apps/:app_id/jwks", authRoutes.JWKS)
 		api.POST("/verify", middleware.ApiKeyMiddleware(devClient, appResolver), authRoutes.VerifyToken)
 		api.GET("/userinfo", authRoutes.UserInfo)

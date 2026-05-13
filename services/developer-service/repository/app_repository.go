@@ -18,6 +18,7 @@ type App struct {
 	LogoURL                  string
 	RedirectURLs             []string
 	RequireEmailVerification bool
+	EmailAuthEnabled         bool
 	APIKeyHash               string
 	CreatedAt                time.Time
 	UpdatedAt                time.Time
@@ -62,11 +63,11 @@ func (r *AppRepository) Create(ctx context.Context, developerID, name, logoURL s
 
 	app := &App{}
 	err = r.db.QueryRow(ctx, `
-		INSERT INTO apps (developer_id, name, app_id, logo_url, redirect_urls, require_email_verification, api_key_hash)
-		VALUES ($1, $2, $3, $4, $5, $6, $7)
-		RETURNING id, app_id, developer_id, name, logo_url, redirect_urls, require_email_verification, api_key_hash, created_at, updated_at
+		INSERT INTO apps (developer_id, name, app_id, logo_url, redirect_urls, require_email_verification, email_auth_enabled, api_key_hash)
+		VALUES ($1, $2, $3, $4, $5, $6, true, $7)
+		RETURNING id, app_id, developer_id, name, logo_url, redirect_urls, require_email_verification, email_auth_enabled, api_key_hash, created_at, updated_at
 	`, developerID, name, appID, logoURL, redirectURLs, requireEmailVerification, apiKeyHash).Scan(
-		&app.ID, &app.AppID, &app.DeveloperID, &app.Name, &app.LogoURL, &app.RedirectURLs, &app.RequireEmailVerification, &app.APIKeyHash, &app.CreatedAt, &app.UpdatedAt,
+		&app.ID, &app.AppID, &app.DeveloperID, &app.Name, &app.LogoURL, &app.RedirectURLs, &app.RequireEmailVerification, &app.EmailAuthEnabled, &app.APIKeyHash, &app.CreatedAt, &app.UpdatedAt,
 	)
 	if err != nil {
 		return nil, "", err
@@ -77,10 +78,10 @@ func (r *AppRepository) Create(ctx context.Context, developerID, name, logoURL s
 func (r *AppRepository) FindByID(ctx context.Context, id string) (*App, error) {
 	app := &App{}
 	err := r.db.QueryRow(ctx, `
-		SELECT id, app_id, developer_id, name, logo_url, redirect_urls, require_email_verification, api_key_hash, created_at, updated_at
+		SELECT id, app_id, developer_id, name, logo_url, redirect_urls, require_email_verification, email_auth_enabled, api_key_hash, created_at, updated_at
 		FROM apps WHERE id::text = $1 OR app_id = $1
 	`, id).Scan(
-		&app.ID, &app.AppID, &app.DeveloperID, &app.Name, &app.LogoURL, &app.RedirectURLs, &app.RequireEmailVerification, &app.APIKeyHash, &app.CreatedAt, &app.UpdatedAt,
+		&app.ID, &app.AppID, &app.DeveloperID, &app.Name, &app.LogoURL, &app.RedirectURLs, &app.RequireEmailVerification, &app.EmailAuthEnabled, &app.APIKeyHash, &app.CreatedAt, &app.UpdatedAt,
 	)
 	if err != nil {
 		return nil, err
@@ -90,7 +91,7 @@ func (r *AppRepository) FindByID(ctx context.Context, id string) (*App, error) {
 
 func (r *AppRepository) ListByDeveloper(ctx context.Context, developerID string) ([]*App, error) {
 	rows, err := r.db.Query(ctx, `
-		SELECT id, app_id, developer_id, name, logo_url, redirect_urls, require_email_verification, api_key_hash, created_at, updated_at
+		SELECT id, app_id, developer_id, name, logo_url, redirect_urls, require_email_verification, email_auth_enabled, api_key_hash, created_at, updated_at
 		FROM apps WHERE developer_id = $1 ORDER BY created_at DESC
 	`, developerID)
 	if err != nil {
@@ -101,7 +102,7 @@ func (r *AppRepository) ListByDeveloper(ctx context.Context, developerID string)
 	var apps []*App
 	for rows.Next() {
 		app := &App{}
-		err := rows.Scan(&app.ID, &app.AppID, &app.DeveloperID, &app.Name, &app.LogoURL, &app.RedirectURLs, &app.RequireEmailVerification, &app.APIKeyHash, &app.CreatedAt, &app.UpdatedAt)
+		err := rows.Scan(&app.ID, &app.AppID, &app.DeveloperID, &app.Name, &app.LogoURL, &app.RedirectURLs, &app.RequireEmailVerification, &app.EmailAuthEnabled, &app.APIKeyHash, &app.CreatedAt, &app.UpdatedAt)
 		if err != nil {
 			return nil, err
 		}
@@ -118,11 +119,12 @@ func (r *AppRepository) Update(ctx context.Context, app *App) (*App, error) {
 			logo_url = $3,
 			redirect_urls = $4,
 			require_email_verification = $5,
+			email_auth_enabled = $6,
 			updated_at = NOW()
 		WHERE id = $1
-		RETURNING id, app_id, developer_id, name, logo_url, redirect_urls, require_email_verification, api_key_hash, created_at, updated_at
-	`, app.ID, app.Name, app.LogoURL, app.RedirectURLs, app.RequireEmailVerification).Scan(
-		&updatedApp.ID, &updatedApp.AppID, &updatedApp.DeveloperID, &updatedApp.Name, &updatedApp.LogoURL, &updatedApp.RedirectURLs, &updatedApp.RequireEmailVerification, &updatedApp.APIKeyHash, &updatedApp.CreatedAt, &updatedApp.UpdatedAt,
+		RETURNING id, app_id, developer_id, name, logo_url, redirect_urls, require_email_verification, email_auth_enabled, api_key_hash, created_at, updated_at
+	`, app.ID, app.Name, app.LogoURL, app.RedirectURLs, app.RequireEmailVerification, app.EmailAuthEnabled).Scan(
+		&updatedApp.ID, &updatedApp.AppID, &updatedApp.DeveloperID, &updatedApp.Name, &updatedApp.LogoURL, &updatedApp.RedirectURLs, &updatedApp.RequireEmailVerification, &updatedApp.EmailAuthEnabled, &updatedApp.APIKeyHash, &updatedApp.CreatedAt, &updatedApp.UpdatedAt,
 	)
 	if err != nil {
 		return nil, err

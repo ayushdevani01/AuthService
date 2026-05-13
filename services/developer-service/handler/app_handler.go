@@ -42,6 +42,7 @@ func (h *AppHandler) CreateApp(ctx context.Context, req *pb.CreateAppRequest) (*
 			CreatedAt:                timestamppb.New(result.App.CreatedAt),
 			UpdatedAt:                timestamppb.New(result.App.UpdatedAt),
 			RequireEmailVerification: result.App.RequireEmailVerification,
+			EmailAuthEnabled:         result.App.EmailAuthEnabled,
 		},
 		ApiKey: result.APIKey,
 		SigningKey: &pb.SigningKey{
@@ -86,6 +87,7 @@ func (h *AppHandler) GetApp(ctx context.Context, req *pb.GetAppRequest) (*pb.Get
 			CreatedAt:                timestamppb.New(app.CreatedAt),
 			UpdatedAt:                timestamppb.New(app.UpdatedAt),
 			RequireEmailVerification: app.RequireEmailVerification,
+			EmailAuthEnabled:         app.EmailAuthEnabled,
 		},
 		Found: true,
 	}, nil
@@ -115,6 +117,7 @@ func (h *AppHandler) GetPublicApp(ctx context.Context, req *pb.GetPublicAppReque
 			CreatedAt:                timestamppb.New(app.CreatedAt),
 			UpdatedAt:                timestamppb.New(app.UpdatedAt),
 			RequireEmailVerification: app.RequireEmailVerification,
+			EmailAuthEnabled:         app.EmailAuthEnabled,
 		},
 		Found: true,
 	}, nil
@@ -142,6 +145,7 @@ func (h *AppHandler) ListApps(ctx context.Context, req *pb.ListAppsRequest) (*pb
 			CreatedAt:                timestamppb.New(app.CreatedAt),
 			UpdatedAt:                timestamppb.New(app.UpdatedAt),
 			RequireEmailVerification: app.RequireEmailVerification,
+			EmailAuthEnabled:         app.EmailAuthEnabled,
 		})
 	}
 
@@ -169,13 +173,16 @@ func (h *AppHandler) UpdateApp(ctx context.Context, req *pb.UpdateAppRequest) (*
 		}
 	}
 
-	app, err := h.appService.UpdateApp(ctx, req.Id, req.DeveloperId, req.Name, req.LogoUrl, redirectArg, req.RequireEmailVerification)
+	app, err := h.appService.UpdateApp(ctx, req.Id, req.DeveloperId, req.Name, req.LogoUrl, redirectArg, req.RequireEmailVerification, req.EmailAuthEnabled)
 	if err != nil {
 		if errors.Is(err, service.ErrAppNotFound) {
 			return nil, status.Error(codes.NotFound, "app not found")
 		}
 		if errors.Is(err, service.ErrNotAppOwner) {
 			return nil, status.Error(codes.PermissionDenied, "not the owner of this app")
+		}
+		if errors.Is(err, service.ErrAtLeastOneAuthMethod) {
+			return nil, status.Error(codes.InvalidArgument, "at_least_one_auth_method_required")
 		}
 		return nil, status.Error(codes.Internal, "failed to update app")
 	}
@@ -191,6 +198,7 @@ func (h *AppHandler) UpdateApp(ctx context.Context, req *pb.UpdateAppRequest) (*
 			CreatedAt:                timestamppb.New(app.CreatedAt),
 			UpdatedAt:                timestamppb.New(app.UpdatedAt),
 			RequireEmailVerification: app.RequireEmailVerification,
+			EmailAuthEnabled:         app.EmailAuthEnabled,
 		},
 	}, nil
 }

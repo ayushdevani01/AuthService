@@ -25,10 +25,11 @@ type AuthRoutes struct {
 	userClient  pbUser.UserServiceClient
 	tokenClient pbToken.TokenServiceClient
 	appResolver *middleware.AppResolver
+	rateLimiter *middleware.AuthRateLimiter
 	issuer      string
 }
 
-func NewAuthRoutes(devClient pbDev.DeveloperServiceClient, userClient pbUser.UserServiceClient, tokenClient pbToken.TokenServiceClient, appResolver *middleware.AppResolver, issuer string) *AuthRoutes {
+func NewAuthRoutes(devClient pbDev.DeveloperServiceClient, userClient pbUser.UserServiceClient, tokenClient pbToken.TokenServiceClient, appResolver *middleware.AppResolver, rateLimiter *middleware.AuthRateLimiter, issuer string) *AuthRoutes {
 	if issuer == "" {
 		issuer = "https://auth.yourplatform.com"
 	}
@@ -37,6 +38,7 @@ func NewAuthRoutes(devClient pbDev.DeveloperServiceClient, userClient pbUser.Use
 		userClient:  userClient,
 		tokenClient: tokenClient,
 		appResolver: appResolver,
+		rateLimiter: rateLimiter,
 		issuer:      issuer,
 	}
 }
@@ -88,6 +90,55 @@ func (ar *AuthRoutes) getPublicApp(c *gin.Context, publicAppID string) (*pbDev.A
 		return nil, fmt.Errorf("app not found")
 	}
 	return resp.App, nil
+}
+
+// GET /api/v1/public/apps/:app_id
+func (ar *AuthRoutes) PublicApp(c *gin.Context) {
+	appID := c.Param("app_id")
+	publicApp, err := ar.getPublicApp(c, appID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "app_not_found"})
+		return
+	}
+
+	providersResp, err := ar.devClient.ListOAuthProviders(c.Request.Context(), &pbDev.ListOAuthProvidersRequest{
+		AppId:       publicApp.Id,
+		DeveloperId: publicApp.DeveloperId,
+	})
+	googleEnabled := false
+	githubEnabled := false
+	if err == nil {
+		for _, provider := range providersResp.Providers {
+			if !provider.Enabled || provider.ClientId == "" {
+				continue
+			}
+			switch provider.Provider {
+			case "google":
+				googleEnabled = true
+			case "github":
+				githubEnabled = true
+			}
+		}
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"name":   publicApp.Name,
+		"app_id": publicApp.AppId,
+		"auth_methods": gin.H{
+			"email":  publicApp.EmailAuthEnabled,
+			"google": googleEnabled,
+			"github": githubEnabled,
+		},
+		"require_email_verification": publicApp.RequireEmailVerification,
+	})
+}
+
+func (ar *AuthRoutes) requireEmailAuth(c *gin.Context, publicApp *pbDev.App) bool {
+	if publicApp == nil || !publicApp.EmailAuthEnabled {
+		c.JSON(http.StatusForbidden, gin.H{"error": "email_auth_disabled"})
+		return false
+	}
+	return true
 }
 
 // GET /oauth/authorize?app_id=xxx&provider=google&redirect_uri=...
@@ -351,20 +402,35 @@ func (ar *AuthRoutes) JWKS(c *gin.Context) {
 // POST /auth/register
 func (ar *AuthRoutes) Register(c *gin.Context) {
 	var req struct {
-		AppID       string `json:"app_id" binding:"required"`
-		Email       string `json:"email" binding:"required"`
-		Password    string `json:"password" binding:"required"`
-		Name        string `json:"name"`
-		RedirectURI string `json:"redirect_uri"`
+		AppID           string `json:"app_id" binding:"required"`
+		Email           string `json:"email" binding:"required"`
+		Password        string `json:"password" binding:"required"`
+		ConfirmPassword string `json:"confirm_password"`
+		Name            string `json:"name"`
+		RedirectURI     string `json:"redirect_uri"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+	if req.ConfirmPassword != "" && req.ConfirmPassword != req.Password {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "password_mismatch"})
+		return
+	}
+	if ar.rateLimiter != nil {
+		ok, rlErr := ar.rateLimiter.AllowRegister(c.Request.Context(), req.AppID, c.ClientIP())
+		if rlErr == nil && !ok {
+			c.JSON(http.StatusTooManyRequests, gin.H{"error": "rate_limited"})
+			return
+		}
+	}
 
 	publicApp, err := ar.getPublicApp(c, req.AppID)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid app_id"})
+		return
+	}
+	if !ar.requireEmailAuth(c, publicApp) {
 		return
 	}
 
@@ -381,6 +447,14 @@ func (ar *AuthRoutes) Register(c *gin.Context) {
 		Name:     req.Name,
 	})
 	if err != nil {
+		if st, ok := status.FromError(err); ok && st.Code() == codes.InvalidArgument {
+			c.JSON(http.StatusBadRequest, gin.H{"error": st.Message()})
+			return
+		}
+		if st, ok := status.FromError(err); ok && st.Code() == codes.AlreadyExists {
+			c.JSON(http.StatusConflict, gin.H{"error": st.Message()})
+			return
+		}
 		c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
 		return
 	}
@@ -456,6 +530,9 @@ func (ar *AuthRoutes) LoginWithEmail(c *gin.Context) {
 	publicApp, err := ar.getPublicApp(c, req.AppID)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid app_id"})
+		return
+	}
+	if !ar.requireEmailAuth(c, publicApp) {
 		return
 	}
 
@@ -539,6 +616,22 @@ func (ar *AuthRoutes) ForgotPassword(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+	if ar.rateLimiter != nil {
+		ok, rlErr := ar.rateLimiter.AllowForgotPassword(c.Request.Context(), req.AppID, c.ClientIP())
+		if rlErr == nil && !ok {
+			c.JSON(http.StatusTooManyRequests, gin.H{"error": "rate_limited"})
+			return
+		}
+	}
+
+	publicApp, err := ar.getPublicApp(c, req.AppID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid app_id"})
+		return
+	}
+	if !ar.requireEmailAuth(c, publicApp) {
+		return
+	}
 
 	resolvedAppID, err := ar.appResolver.ResolveAppID(c, req.AppID)
 	if err != nil {
@@ -559,12 +652,26 @@ func (ar *AuthRoutes) ForgotPassword(c *gin.Context) {
 // POST /auth/reset-password
 func (ar *AuthRoutes) ResetPassword(c *gin.Context) {
 	var req struct {
-		AppID       string `json:"app_id" binding:"required"`
-		Token       string `json:"token" binding:"required"`
-		NewPassword string `json:"new_password" binding:"required"`
+		AppID           string `json:"app_id" binding:"required"`
+		Token           string `json:"token" binding:"required"`
+		NewPassword     string `json:"new_password" binding:"required"`
+		ConfirmPassword string `json:"confirm_password"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if req.ConfirmPassword != "" && req.ConfirmPassword != req.NewPassword {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "password_mismatch"})
+		return
+	}
+
+	publicApp, err := ar.getPublicApp(c, req.AppID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid app_id"})
+		return
+	}
+	if !ar.requireEmailAuth(c, publicApp) {
 		return
 	}
 

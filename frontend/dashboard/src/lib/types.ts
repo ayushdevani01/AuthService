@@ -20,6 +20,7 @@ export type AppRecord = {
   logo_url?: string;
   redirect_urls: string[];
   require_email_verification: boolean;
+  email_auth_enabled?: boolean;
   created_at: string;
   updated_at: string;
 };
