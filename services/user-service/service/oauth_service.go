@@ -25,10 +25,11 @@ import (
 )
 
 var (
-	ErrInvalidState    = errors.New("invalid or expired OAuth state")
-	ErrProviderNotConf = errors.New("OAuth provider not configured for this app")
-	ErrOAuthFailed     = errors.New("OAuth token exchange failed")
-	ErrInvalidVerifier = errors.New("invalid PKCE code verifier")
+	ErrInvalidState     = errors.New("invalid or expired OAuth state")
+	ErrProviderNotConf  = errors.New("OAuth provider not configured for this app")
+	ErrOAuthFailed      = errors.New("OAuth token exchange failed")
+	ErrInvalidVerifier  = errors.New("invalid PKCE code verifier")
+	ErrProviderMismatch = errors.New("oauth_provider_mismatch")
 )
 
 // OAuthProviderConfig from the oauth_providers table
@@ -171,25 +172,32 @@ func (s *OAuthService) HandleOAuthCallback(ctx context.Context, provider, code, 
 	if err != nil {
 		return nil, "", "", false, ErrInvalidState
 	}
-	s.redisClient.Del(ctx, redisKey)
 
 	var stateData oauthState
 	if err := json.Unmarshal([]byte(stateJSON), &stateData); err != nil {
 		return nil, "", "", false, ErrInvalidState
 	}
 
+	// Reject path/provider mismatch before consuming state so a retry with the
+	// correct callback path can still succeed.
+	if provider != stateData.Provider {
+		return nil, stateData.AppID, stateData.RedirectURI, false, ErrProviderMismatch
+	}
+
+	s.redisClient.Del(ctx, redisKey)
+
 	// PKCE Verification
 	if stateData.CodeChallenge == "" {
-		return nil, "", "", false, errors.New("missing PKCE code challenge")
+		return nil, stateData.AppID, stateData.RedirectURI, false, errors.New("missing PKCE code challenge")
 	}
 	if !verifyPKCE(stateData.CodeChallenge, stateData.CodeChallengeMethod, stateData.CodeVerifier) {
-		return nil, "", "", false, ErrInvalidVerifier
+		return nil, stateData.AppID, stateData.RedirectURI, false, ErrInvalidVerifier
 	}
 
 	// Get provider config
 	providerConfig, err := s.getProviderConfig(ctx, stateData.AppID, provider)
 	if err != nil {
-		return nil, "", "", false, err
+		return nil, stateData.AppID, stateData.RedirectURI, false, err
 	}
 
 	// Exchange code for tokens and get user info
