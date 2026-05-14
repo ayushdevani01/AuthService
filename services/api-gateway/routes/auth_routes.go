@@ -207,19 +207,29 @@ func (ar *AuthRoutes) Callback(c *gin.Context) {
 		State:    state,
 	})
 	if err != nil {
-		if st, ok := status.FromError(err); ok && st.Code() == codes.AlreadyExists {
+		if st, ok := status.FromError(err); ok {
 			msg := st.Message()
-			if strings.HasPrefix(msg, "account_exists_use_original_provider") {
-				redirectURI := ""
-				if parts := strings.SplitN(msg, "|", 2); len(parts) == 2 {
-					redirectURI = parts[1]
-				}
-				if redirectURI != "" {
-					values := url.Values{}
-					values.Set("error", "account_exists_use_original_provider")
-					c.Redirect(http.StatusFound, buildRedirectURLWithFragment(redirectURI, values))
-					return
-				}
+			errorCode := "oauth_callback_failed"
+			redirectURI := ""
+			if parts := strings.SplitN(msg, "|", 2); len(parts) == 2 {
+				errorCode = parts[0]
+				redirectURI = parts[1]
+			} else if strings.HasPrefix(msg, "account_exists_use_original_provider") {
+				errorCode = "account_exists_use_original_provider"
+			} else if strings.HasPrefix(msg, "oauth_provider_mismatch") {
+				errorCode = "oauth_provider_mismatch"
+			} else if strings.HasPrefix(msg, "invalid_pkce_verifier") {
+				errorCode = "invalid_pkce_verifier"
+			}
+			if redirectURI != "" {
+				values := url.Values{}
+				values.Set("error", errorCode)
+				c.Redirect(http.StatusFound, buildRedirectURLWithFragment(redirectURI, values))
+				return
+			}
+			if st.Code() == codes.InvalidArgument {
+				c.JSON(http.StatusBadRequest, gin.H{"error": errorCode})
+				return
 			}
 		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "OAuth callback failed"})
