@@ -136,9 +136,10 @@ func (s *TokenService) RefreshTokens(ctx context.Context, refreshToken, appID st
 		return "", nil, 0, nil, err
 	}
 
-	// Sign new access token
+	// Sign new access token (same default TTL as GenerateTokenPair)
 	now := time.Now()
-	accessExp := now.Add(1 * time.Hour)
+	accessTTL := int64(3600)
+	accessExp := now.Add(time.Duration(accessTTL) * time.Second)
 
 	claims := jwt.MapClaims{
 		"iss":            s.issuer,
