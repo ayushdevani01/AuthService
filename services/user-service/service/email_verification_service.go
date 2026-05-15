@@ -78,6 +78,13 @@ func (s *EmailVerificationService) VerifyEmail(ctx context.Context, appID, rawTo
 		return "", err
 	}
 
+	user, findErr := s.userRepo.FindByID(ctx, userID, appID)
+	if findErr == nil && user != nil && user.EmailVerified {
+		s.redis.Del(ctx, redisKey)
+		s.userRepo.DeleteEmailVerificationToken(ctx, tokenHash)
+		return userID, nil
+	}
+
 	// Mark email_verified = true
 	emailVerified := true
 	_, err = s.userRepo.Update(ctx, userID, appID, nil, nil, nil, &emailVerified)
