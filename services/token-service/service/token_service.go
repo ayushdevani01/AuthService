@@ -46,13 +46,16 @@ type TokenPairResult struct {
 	RefreshTokenExpiresAt int64
 }
 
-func (s *TokenService) GenerateTokenPair(ctx context.Context, appID, userID, email, provider string, emailVerified bool, sessionID string, accessTTL, refreshTTL int64) (*TokenPairResult, error) {
+func (s *TokenService) GenerateTokenPair(ctx context.Context, appID, userID, email, provider string, emailVerified bool, sessionID string, accessTTL, refreshTTL int64, audience string) (*TokenPairResult, error) {
 	// Refresh token is created by user-service CreateSession.
 	// This method is only responsible for generating the access token and optionally rotating the refresh token.
 
 	// Set defaults
 	if accessTTL <= 0 {
 		accessTTL = 3600 // 1 hour
+	}
+	if audience == "" {
+		audience = appID
 	}
 
 	// Get signing key
@@ -75,7 +78,7 @@ func (s *TokenService) GenerateTokenPair(ctx context.Context, appID, userID, ema
 	claims := jwt.MapClaims{
 		"iss":            s.issuer,
 		"sub":            userID,
-		"aud":            appID,
+		"aud":            audience,
 		"exp":            accessExp.Unix(),
 		"iat":            now.Unix(),
 		"email":          email,
@@ -100,7 +103,11 @@ func (s *TokenService) GenerateTokenPair(ctx context.Context, appID, userID, ema
 	}, nil
 }
 
-func (s *TokenService) RefreshTokens(ctx context.Context, refreshToken, appID string, rotateRefreshToken bool) (string, *string, int64, *int64, error) {
+func (s *TokenService) RefreshTokens(ctx context.Context, refreshToken, appID string, rotateRefreshToken bool, audience string) (string, *string, int64, *int64, error) {
+	if audience == "" {
+		audience = appID
+	}
+
 	// Get signing key to sign the new access token
 	privateKeyPEM, kid, _, err := s.signingKeyRepo.GetDecryptedPrivateKey(ctx, appID)
 	if err != nil {
@@ -144,7 +151,7 @@ func (s *TokenService) RefreshTokens(ctx context.Context, refreshToken, appID st
 	claims := jwt.MapClaims{
 		"iss":            s.issuer,
 		"sub":            session.UserID,
-		"aud":            appID,
+		"aud":            audience,
 		"exp":            accessExp.Unix(),
 		"iat":            now.Unix(),
 		"email":          email,
