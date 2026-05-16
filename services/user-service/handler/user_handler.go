@@ -157,11 +157,17 @@ func (h *UserHandler) HandleOAuthCallback(ctx context.Context, req *pb.HandleOAu
 		if errors.Is(err, service.ErrInvalidState) {
 			return nil, status.Errorf(codes.InvalidArgument, "invalid or expired OAuth state")
 		}
+		if errors.Is(err, service.ErrProviderMismatch) {
+			return nil, status.Errorf(codes.InvalidArgument, "oauth_provider_mismatch|%s", redirectURI)
+		}
 		if errors.Is(err, service.ErrInvalidVerifier) {
-			return nil, status.Errorf(codes.InvalidArgument, "invalid PKCE code verifier")
+			return nil, status.Errorf(codes.InvalidArgument, "invalid_pkce_verifier|%s", redirectURI)
 		}
 		if errors.Is(err, service.ErrAccountExistsUseOriginalProvider) {
 			return nil, status.Errorf(codes.AlreadyExists, "account_exists_use_original_provider|%s", redirectURI)
+		}
+		if redirectURI != "" {
+			return nil, status.Errorf(codes.Internal, "oauth_callback_failed|%s", redirectURI)
 		}
 		return nil, status.Errorf(codes.Internal, "OAuth callback failed: %v", err)
 	}
