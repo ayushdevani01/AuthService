@@ -175,6 +175,7 @@ func (ar *AuthRoutes) Authorize(c *gin.Context) {
 		AppId:       resolvedAppID,
 		Provider:    provider,
 		RedirectUri: redirectURI,
+		PublicAppId: publicApp.AppId,
 	})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to initiate OAuth"})
@@ -249,6 +250,11 @@ func (ar *AuthRoutes) Callback(c *gin.Context) {
 		return
 	}
 
+	audience := callbackResp.PublicAppId
+	if audience == "" {
+		audience = callbackResp.AppId
+	}
+
 	// Generate token pair
 	tokenResp, err := ar.tokenClient.GenerateTokenPair(c.Request.Context(), &pbToken.GenerateTokenPairRequest{
 		AppId:           callbackResp.AppId,
@@ -258,6 +264,7 @@ func (ar *AuthRoutes) Callback(c *gin.Context) {
 		EmailVerified:   callbackResp.User.EmailVerified,
 		SessionId:       sessionResp.Session.Id,
 		RefreshTokenTtl: 30 * 24 * 60 * 60,
+		Audience:        audience,
 	})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to generate tokens"})
@@ -294,6 +301,12 @@ func (ar *AuthRoutes) RefreshTokens(c *gin.Context) {
 		return
 	}
 
+	publicApp, err := ar.getPublicApp(c, req.AppID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid app_id"})
+		return
+	}
+
 	resolvedAppID, err := ar.appResolver.ResolveAppID(c, req.AppID)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid app_id"})
@@ -304,6 +317,7 @@ func (ar *AuthRoutes) RefreshTokens(c *gin.Context) {
 		RefreshToken:       req.RefreshToken,
 		AppId:              resolvedAppID,
 		RotateRefreshToken: req.RotateRefreshToken,
+		Audience:           publicApp.AppId,
 	})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -503,6 +517,7 @@ func (ar *AuthRoutes) Register(c *gin.Context) {
 		EmailVerified:   userResp.User.EmailVerified,
 		SessionId:       sessionResp.Session.Id,
 		RefreshTokenTtl: 30 * 24 * 60 * 60,
+		Audience:        publicApp.AppId,
 	})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to generate tokens"})
@@ -595,6 +610,7 @@ func (ar *AuthRoutes) LoginWithEmail(c *gin.Context) {
 		EmailVerified:   loginResp.User.EmailVerified,
 		SessionId:       sessionResp.Session.Id,
 		RefreshTokenTtl: 30 * 24 * 60 * 60,
+		Audience:        publicApp.AppId,
 	})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to generate tokens"})
@@ -798,7 +814,7 @@ func (ar *AuthRoutes) VerifyToken(c *gin.Context) {
 		}
 
 		return nil, fmt.Errorf("public key '%s' not found for app '%s'", kid, req.AppID)
-	}, jwt.WithIssuer(ar.issuer), jwt.WithAudience(resolvedAppID))
+	}, jwt.WithIssuer(ar.issuer))
 
 	if err != nil || !token.Valid {
 		errMsg := "invalid token"
@@ -810,6 +826,25 @@ func (ar *AuthRoutes) VerifyToken(c *gin.Context) {
 			"error": errMsg,
 		})
 		return
+	}
+
+	claims, ok := token.Claims.(jwt.MapClaims)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"valid": false, "error": "invalid token claims"})
+		return
+	}
+	aud, ok := extractStringClaim(claims["aud"])
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"valid": false, "error": "missing aud claim"})
+		return
+	}
+	// Accept publishable app id (current) or internal UUID (legacy tokens during rollout).
+	if aud != req.AppID && aud != resolvedAppID && aud != authenticatedAppID.(string) {
+		publicApp, pubErr := ar.getPublicApp(c, req.AppID)
+		if pubErr != nil || (aud != publicApp.AppId && aud != publicApp.Id) {
+			c.JSON(http.StatusUnauthorized, gin.H{"valid": false, "error": "audience mismatch"})
+			return
+		}
 	}
 
 	c.JSON(http.StatusOK, gin.H{
