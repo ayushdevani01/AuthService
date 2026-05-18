@@ -157,17 +157,14 @@ func (h *AppHandler) UpdateApp(ctx context.Context, req *pb.UpdateAppRequest) (*
 		return nil, status.Error(codes.InvalidArgument, "id and developer_id are required")
 	}
 
-	// Proto3 cannot distinguish "omit redirects" from "set empty".
-	// Gateway only populates RedirectUrls when the JSON field is present.
-	var redirectURLs []string
-	updateRedirects := req.RedirectUrls != nil
-	if updateRedirects {
-		redirectURLs = req.RedirectUrls
-	}
-
+	// Prefer explicit update_redirect_urls; fall back to non-nil RedirectUrls for older clients.
 	var redirectArg []string
+	updateRedirects := req.UpdateRedirectUrls != nil && *req.UpdateRedirectUrls
+	if !updateRedirects {
+		updateRedirects = req.RedirectUrls != nil
+	}
 	if updateRedirects {
-		redirectArg = redirectURLs
+		redirectArg = req.RedirectUrls
 		if redirectArg == nil {
 			redirectArg = []string{}
 		}

@@ -155,6 +155,8 @@ message UpdateAppRequest {
   repeated string redirect_urls = 5;
   optional bool require_email_verification = 6;
   optional bool email_auth_enabled = 7;
+  // When true, apply redirect_urls even if the list is empty (clear all).
+  optional bool update_redirect_urls = 8;
 }
 
 message UpdateAppResponse { App app = 1; }
@@ -241,6 +243,7 @@ message AddOAuthProviderRequest {
   string client_id = 4;
   string client_secret = 5;
   repeated string scopes = 6;
+  optional bool enabled = 7;
 }
 
 message AddOAuthProviderResponse { OAuthProvider provider = 1; }

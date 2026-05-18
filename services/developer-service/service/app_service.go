@@ -10,10 +10,11 @@ import (
 )
 
 var (
-	ErrAppNotFound           = errors.New("app not found")
-	ErrNotAppOwner           = errors.New("not the owner of this app")
-	ErrProviderNotFound      = errors.New("oauth provider not found")
-	ErrAtLeastOneAuthMethod  = errors.New("at_least_one_auth_method_required")
+	ErrAppNotFound              = errors.New("app not found")
+	ErrNotAppOwner              = errors.New("not the owner of this app")
+	ErrProviderNotFound         = errors.New("oauth provider not found")
+	ErrAtLeastOneAuthMethod     = errors.New("at_least_one_auth_method_required")
+	ErrProviderCredentialsRequired = errors.New("oauth_credentials_required")
 )
 
 type AppService struct {
@@ -226,7 +227,7 @@ func (s *AppService) GetActiveSigningKey(ctx context.Context, appID string) (*Ac
 }
 
 // OAuth Provider methods
-func (s *AppService) AddOAuthProvider(ctx context.Context, appID, developerID, provider, clientID, clientSecret string, scopes []string) (*repository.OAuthProvider, error) {
+func (s *AppService) AddOAuthProvider(ctx context.Context, appID, developerID, provider, clientID, clientSecret string, scopes []string, enabled *bool) (*repository.OAuthProvider, error) {
 	app, err := s.appRepo.FindByID(ctx, appID)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -239,12 +240,21 @@ func (s *AppService) AddOAuthProvider(ctx context.Context, appID, developerID, p
 		return nil, ErrNotAppOwner
 	}
 
+	if clientID == "" || clientSecret == "" {
+		return nil, ErrProviderCredentialsRequired
+	}
+
 	encryptedSecret, err := auth.Encrypt(clientSecret, s.encryptionKey)
 	if err != nil {
 		return nil, err
 	}
 
-	return s.oauthRepo.Create(ctx, app.ID, provider, clientID, encryptedSecret, scopes)
+	enabledValue := true
+	if enabled != nil {
+		enabledValue = *enabled
+	}
+
+	return s.oauthRepo.Create(ctx, app.ID, provider, clientID, encryptedSecret, scopes, enabledValue)
 }
 
 type OAuthProviderResponse struct {
@@ -308,6 +318,27 @@ func (s *AppService) UpdateOAuthProvider(ctx context.Context, appID, developerID
 		}
 		if !ok {
 			return nil, ErrAtLeastOneAuthMethod
+		}
+	}
+
+	if enabled != nil && *enabled {
+		existing, findErr := s.oauthRepo.FindAnyByAppAndProvider(ctx, app.ID, provider)
+		if findErr != nil {
+			if errors.Is(findErr, pgx.ErrNoRows) {
+				return nil, ErrProviderNotFound
+			}
+			return nil, findErr
+		}
+		nextClientID := existing.ClientID
+		if clientID != nil {
+			nextClientID = *clientID
+		}
+		hasSecret := existing.ClientSecretEncrypted != ""
+		if clientSecret != nil {
+			hasSecret = *clientSecret != ""
+		}
+		if nextClientID == "" || !hasSecret {
+			return nil, ErrProviderCredentialsRequired
 		}
 	}
 
