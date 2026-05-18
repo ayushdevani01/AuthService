@@ -6,27 +6,26 @@ import { CodeBlock, CodeTabs } from '@/components/ui';
 const sections = [
   {
     title: 'Integration contract',
-    description: 'Every app currently has three values that matter during integration.',
+    description: 'Happy path uses one publishable key plus a secret API key for server-side verify.',
     items: [
-      'Public app ID: use for JWKS lookup, hosted login, and x-app-id on public verification requests.',
-      'Audience app ID: use as the expected JWT aud value in your backend or Node SDK.',
-      'API key: use for POST /api/v1/verify requests from your backend.',
+      'Publishable key: use for JWKS, hosted login, JWT aud, and x-app-id.',
+      'API key: use for POST /api/v1/verify requests from your backend only.',
     ],
   },
   {
     title: 'Hosted login flow',
-    description: 'The hosted login UI expects the public app ID and a redirect URI.',
+    description: 'The hosted login UI expects the publishable key and a redirect URI.',
     items: [
       'Local login UI URL: http://localhost:3001',
       'Required query params: app_id and redirect_uri',
-      'Use the same redirect URI in your AuthService app and the OAuth provider console',
+      'IdP allowlist must use the AuthService callback URL (/oauth/callback/{provider}), not your app callback.',
     ],
   },
   {
     title: 'Backend verification',
     description: 'You can verify tokens with the Node SDK or through the verification API.',
     items: [
-      'SDK verification uses the public app ID for JWKS and the audience app ID for aud validation.',
+      'SDK verification uses the publishable key for both JWKS and aud.',
       'REST verification uses x-api-key plus x-app-id headers.',
       'Both verification paths validate signature, issuer, and audience.',
     ],
@@ -35,7 +34,7 @@ const sections = [
     title: 'React frontend SDK',
     description: 'The frontend SDK is meant to reduce integration to a provider, a callback handler, and a few hook calls.',
     items: [
-      'Wrap your app with AuthServiceProvider using the public app ID, auth URL, and redirect URI.',
+      'Wrap your app with AuthServiceProvider using the publishable key, auth URL, and redirect URI.',
       'Render AuthCallbackHandler on your callback route to store returned tokens automatically.',
       'Use useAuth() for login, logout, and current user state.',
     ],
@@ -48,29 +47,29 @@ const sections = [
       'Click Create Credentials > OAuth client ID.',
       'If prompted, configure the OAuth consent screen first and save it.',
       'Choose Web application as the application type.',
-      'Under Authorized redirect URIs, paste the same callback URL you added in AuthService.',
+      'Under Authorized redirect URIs, paste the AuthService callback: http://localhost:8080/oauth/callback/google',
       'Copy the generated Client ID and Client Secret, then paste them into Dashboard > App > Providers > Google.',
     ],
   },
   {
     title: 'GitHub OAuth setup',
-    description: 'Create an OAuth app in GitHub and use the exact same callback URL you registered in AuthService.',
+    description: 'Create an OAuth app in GitHub and use the AuthService callback URL.',
     items: [
       'Open GitHub Settings > Developer settings > OAuth Apps.',
       'Click New OAuth App.',
       'Fill in Application name, Homepage URL, and Authorization callback URL.',
-      'Paste the same callback URL you configured in AuthService into Authorization callback URL.',
+      'Paste http://localhost:8080/oauth/callback/github into Authorization callback URL.',
       'Create the app, then copy the Client ID and generate a Client Secret.',
       'Paste both values into Dashboard > App > Providers > GitHub.',
     ],
   },
 ];
 
-const envSnippet = `AUTH_APP_ID=app_your_public_app_id\nAUTH_AUDIENCE=your-internal-app-uuid\nAUTH_API_URL=http://localhost:8080\nAUTH_ISSUER=https://auth.yourplatform.com`;
+const envSnippet = `AUTH_APP_ID=app_your_publishable_key\nAUTH_API_URL=http://localhost:8080\nAUTH_ISSUER=https://auth.yourplatform.com`;
 
-const reactSnippet = `import { AuthCallbackHandler, AuthGuard, AuthServiceProvider, useAuth } from 'authservice-react';\n\nfunction LoginButton() {\n  const { login } = useAuth();\n  return <button onClick={() => login()}>Sign in</button>;\n}\n\nexport default function App() {\n  return (\n    <AuthServiceProvider\n      appId={process.env.NEXT_PUBLIC_AUTH_APP_ID!}\n      authUrl={process.env.NEXT_PUBLIC_AUTH_URL!}\n      redirectUri={process.env.NEXT_PUBLIC_AUTH_REDIRECT_URI!}\n    >\n      <AuthCallbackHandler />\n      <AuthGuard fallback={<LoginButton />}>\n        <div>Protected app content</div>\n      </AuthGuard>\n    </AuthServiceProvider>\n  );\n}`;
+const reactSnippet = `import { AuthCallbackHandler, AuthGuard, AuthServiceProvider, useAuth } from 'authservice-react';\n\nfunction LoginButton() {\n  const { login } = useAuth();\n  return <button onClick={() => login()}>Sign in</button>;\n}\n\nexport default function App() {\n  return (\n    <AuthServiceProvider\n      appId={process.env.NEXT_PUBLIC_AUTH_PUBLISHABLE_KEY!}\n      authUrl={process.env.NEXT_PUBLIC_AUTH_URL!}\n      redirectUri={process.env.NEXT_PUBLIC_AUTH_REDIRECT_URI!}\n    >\n      <AuthCallbackHandler />\n      <AuthGuard fallback={<LoginButton />}>\n        <div>Protected app content</div>\n      </AuthGuard>\n    </AuthServiceProvider>\n  );\n}`;
 
-const nodeSnippet = `import { requireAuth } from 'authservice-node';\n\napp.get('/protected', requireAuth({\n  appId: process.env.AUTH_APP_ID,\n  audience: process.env.AUTH_AUDIENCE,\n  apiUrl: process.env.AUTH_API_URL,\n  issuer: process.env.AUTH_ISSUER,\n}), (req, res) => {\n  res.json({ user: req.auth });\n});`;
+const nodeSnippet = `import { requireAuth } from 'authservice-node';\n\napp.get('/protected', requireAuth({\n  appId: process.env.AUTH_APP_ID,\n  apiUrl: process.env.AUTH_API_URL,\n  issuer: process.env.AUTH_ISSUER,\n}), (req, res) => {\n  res.json({ user: req.auth });\n});`;
 
 const verifySnippet = `curl -X POST http://localhost:8080/api/v1/verify \\\n  -H "Content-Type: application/json" \\\n  -H "x-api-key: <your-api-key>" \\\n  -H "x-app-id: <your-public-app-id>" \\\n  -d '{\n    "token": "<jwt>",\n    "app_id": "<your-public-app-id>"\n  }'`;
 

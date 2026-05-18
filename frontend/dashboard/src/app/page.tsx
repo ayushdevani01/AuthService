@@ -24,52 +24,51 @@ const setupSteps = [
   {
     step: '01',
     title: 'Create an app in the dashboard',
-    description: 'You will receive a public app ID, an internal audience UUID, and a one-time API key.',
+    description: 'You will receive one publishable key and a one-time API key.',
   },
   {
     step: '02',
     title: 'Register redirect URLs and providers',
-    description: 'Add every callback URL you use locally and in production, then connect Google or GitHub credentials.',
+    description: 'Add every app callback URL, then connect Google or GitHub with the AuthService OAuth callback allowlisted at the IdP.',
   },
   {
     step: '03',
-    title: 'Add the right values to your app',
-    description: 'Use the public app ID for JWKS and hosted login. Use the internal UUID as the JWT audience.',
+    title: 'Add the publishable key to your app',
+    description: 'Use the same key for hosted login, JWKS, and JWT audience validation.',
   },
   {
     step: '04',
     title: 'Verify tokens in your backend',
-    description: 'Use the Node SDK or call the verification API with your API key and public app ID.',
+    description: 'Use the Node SDK or call the verification API with your API key and publishable key.',
   },
 ];
 
 const codeTabs = {
-  env: `AUTH_APP_ID=app_your_public_app_id\nAUTH_AUDIENCE=your-internal-app-uuid\nAUTH_API_URL=http://localhost:8080\nAUTH_ISSUER=https://auth.yourplatform.com`,
-  react: `import { AuthCallbackHandler, AuthGuard, AuthServiceProvider, useAuth } from 'authservice-react';\n\nfunction LoginButton() {\n  const { login } = useAuth();\n  return <button onClick={() => login()}>Sign in</button>;\n}\n\nexport default function App() {\n  return (\n    <AuthServiceProvider\n      appId={process.env.NEXT_PUBLIC_AUTH_APP_ID!}\n      authUrl={process.env.NEXT_PUBLIC_AUTH_URL!}\n      redirectUri={process.env.NEXT_PUBLIC_AUTH_REDIRECT_URI!}\n    >\n      <AuthCallbackHandler />\n      <AuthGuard fallback={<LoginButton />}>\n        <div>Protected app content</div>\n      </AuthGuard>\n    </AuthServiceProvider>\n  );\n}`,
-  node: `import { requireAuth } from 'authservice-node';\n\napp.get('/protected', requireAuth({\n  appId: process.env.AUTH_APP_ID,\n  audience: process.env.AUTH_AUDIENCE,\n  apiUrl: process.env.AUTH_API_URL,\n  issuer: process.env.AUTH_ISSUER,\n}), (req, res) => {\n  res.json({ user: req.auth });\n});`,
-  curl: `curl -X POST http://localhost:8080/api/v1/verify \\\n  -H "Content-Type: application/json" \\\n  -H "x-api-key: <your-api-key>" \\\n  -H "x-app-id: <your-public-app-id>" \\\n  -d '{\n    "token": "<jwt>",\n    "app_id": "<your-public-app-id>"\n  }'`,
+  env: `AUTH_APP_ID=app_your_publishable_key\nAUTH_API_URL=http://localhost:8080\nAUTH_ISSUER=https://auth.yourplatform.com`,
+  react: `import { AuthCallbackHandler, AuthGuard, AuthServiceProvider, useAuth } from 'authservice-react';\n\nfunction LoginButton() {\n  const { login } = useAuth();\n  return <button onClick={() => login()}>Sign in</button>;\n}\n\nexport default function App() {\n  return (\n    <AuthServiceProvider\n      appId={process.env.NEXT_PUBLIC_AUTH_PUBLISHABLE_KEY!}\n      authUrl={process.env.NEXT_PUBLIC_AUTH_URL!}\n      redirectUri={process.env.NEXT_PUBLIC_AUTH_REDIRECT_URI!}\n    >\n      <AuthCallbackHandler />\n      <AuthGuard fallback={<LoginButton />}>\n        <div>Protected app content</div>\n      </AuthGuard>\n    </AuthServiceProvider>\n  );\n}`,
+  node: `import { requireAuth } from 'authservice-node';\n\napp.get('/protected', requireAuth({\n  appId: process.env.AUTH_APP_ID,\n  apiUrl: process.env.AUTH_API_URL,\n  issuer: process.env.AUTH_ISSUER,\n}), (req, res) => {\n  res.json({ user: req.auth });\n});`,
+  curl: `curl -X POST http://localhost:8080/api/v1/verify \\\n  -H "Content-Type: application/json" \\\n  -H "x-api-key: <your-api-key>" \\\n  -H "x-app-id: <your-publishable-key>" \\\n  -d '{\n    "token": "<jwt>",\n    "app_id": "<your-publishable-key>"\n  }'`,
 };
 
 const docSections = [
   {
     id: 'identifiers',
-    title: 'Know your identifiers',
-    body: 'This platform intentionally uses two app identifiers. The public app ID is for JWKS lookup and public API requests. The internal UUID is the JWT audience value.',
+    title: 'Know your credentials',
+    body: 'Happy path uses one publishable key everywhere on the client and for JWT aud. Keep the API key on the server only.',
     bullets: [
-      '`AUTH_APP_ID` = public app ID like `app_xxx`',
-      '`AUTH_AUDIENCE` = internal app UUID used in `aud`',
+      '`AUTH_APP_ID` / publishable key = `app_xxx` for JWKS, login, and aud',
       '`x-api-key` = backend verification API credential',
     ],
   },
   {
     id: 'oauth',
     title: 'Configure OAuth correctly',
-    body: 'Your callback URL must match across AuthService and the provider console. Treat local and production environments as separate entries.',
+    body: 'Allowlist the AuthService callback URL in Google/GitHub. Your app redirect URI is separate and registered in AuthService settings.',
     bullets: [
       'In Google Cloud Console, go to APIs & Services > Credentials > Create Credentials > OAuth client ID.',
-      'Choose Web application, then paste your AuthService callback URL into Authorized redirect URIs.',
+      'Choose Web application, then paste http://localhost:8080/oauth/callback/google into Authorized redirect URIs.',
       'In GitHub, go to Settings > Developer settings > OAuth Apps > New OAuth App.',
-      'Paste the same callback URL into Authorization callback URL, then copy the generated Client ID and Client Secret into the dashboard provider form.',
+      'Paste http://localhost:8080/oauth/callback/github into Authorization callback URL, then copy Client ID and Secret into the dashboard.',
     ],
   },
   {
@@ -159,12 +158,8 @@ export default function HomePage() {
               <h2 className="text-2xl font-semibold text-foreground">What developers need on day one</h2>
               <div className="space-y-3">
                 <div className="rounded-2xl border border-[var(--border)] bg-[var(--background-alt)] p-4">
-                  <p className="text-xs uppercase tracking-[0.3em] text-muted">Public App ID</p>
-                  <p className="mt-2 text-sm text-foreground">Used for JWKS lookup, hosted login, and public API requests.</p>
-                </div>
-                <div className="rounded-2xl border border-[var(--border)] bg-[var(--background-alt)] p-4">
-                  <p className="text-xs uppercase tracking-[0.3em] text-muted">Audience UUID</p>
-                  <p className="mt-2 text-sm text-foreground">Used as the expected JWT `aud` value in backend verification.</p>
+                  <p className="text-xs uppercase tracking-[0.3em] text-muted">Publishable Key</p>
+                  <p className="mt-2 text-sm text-foreground">One key for JWKS, hosted login, JWT aud, and public API requests.</p>
                 </div>
                 <div className="rounded-2xl border border-[var(--border)] bg-[var(--background-alt)] p-4">
                   <p className="text-xs uppercase tracking-[0.3em] text-muted">Verify API Key</p>
@@ -269,7 +264,7 @@ export default function HomePage() {
               <p className="text-xs uppercase tracking-[0.35em] text-muted">Next Step</p>
               <h2 className="mt-2 text-3xl font-semibold text-foreground">Create an app and copy the integration values from the dashboard</h2>
               <p className="mt-3 max-w-2xl text-sm leading-7 text-muted">
-                The dashboard now surfaces the public app ID, audience UUID, and API key separately so developers do not have to guess which value belongs in the SDK, JWKS route, or verify API.
+                The dashboard surfaces one publishable key plus the API key so developers can wire JWKS, login, and verify without juggling two app IDs.
               </p>
             </div>
             <div className="flex flex-wrap gap-3">
