@@ -138,7 +138,7 @@ func (h *UserHandler) ListUsers(ctx context.Context, req *pb.ListUsersRequest) (
 // --- OAuth ---
 
 func (h *UserHandler) InitiateOAuth(ctx context.Context, req *pb.InitiateOAuthRequest) (*pb.InitiateOAuthResponse, error) {
-	authURL, state, err := h.oauthService.InitiateOAuth(ctx, req.AppId, req.Provider, req.RedirectUri)
+	authURL, state, err := h.oauthService.InitiateOAuth(ctx, req.AppId, req.Provider, req.RedirectUri, req.PublicAppId)
 	if err != nil {
 		if errors.Is(err, service.ErrProviderNotConf) {
 			return nil, status.Errorf(codes.NotFound, "OAuth provider not configured: %s", req.Provider)
@@ -152,7 +152,7 @@ func (h *UserHandler) InitiateOAuth(ctx context.Context, req *pb.InitiateOAuthRe
 }
 
 func (h *UserHandler) HandleOAuthCallback(ctx context.Context, req *pb.HandleOAuthCallbackRequest) (*pb.HandleOAuthCallbackResponse, error) {
-	user, appID, redirectURI, isNewUser, err := h.oauthService.HandleOAuthCallback(ctx, req.Provider, req.Code, req.State)
+	user, appID, redirectURI, publicAppID, isNewUser, err := h.oauthService.HandleOAuthCallback(ctx, req.Provider, req.Code, req.State)
 	if err != nil {
 		if errors.Is(err, service.ErrInvalidState) {
 			return nil, status.Errorf(codes.InvalidArgument, "invalid or expired OAuth state")
@@ -176,6 +176,7 @@ func (h *UserHandler) HandleOAuthCallback(ctx context.Context, req *pb.HandleOAu
 		AppId:       appID,
 		RedirectUri: redirectURI,
 		IsNewUser:   isNewUser,
+		PublicAppId: publicAppID,
 	}, nil
 }
 

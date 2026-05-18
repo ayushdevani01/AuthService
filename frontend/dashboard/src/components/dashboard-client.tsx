@@ -113,8 +113,7 @@ export function DashboardClient() {
           <div className="mt-6 rounded-3xl border border-[var(--border)] bg-[var(--background-alt)] p-5">
             <p className="text-xs uppercase tracking-[0.3em] text-muted">What you will receive</p>
             <div className="mt-4 space-y-3 text-sm text-foreground">
-              <p>Public app ID for JWKS, hosted login, and public verification requests.</p>
-              <p>Audience app ID for JWT `aud` validation.</p>
+              <p>Publishable key for hosted login, JWKS, and JWT `aud`.</p>
               <p>One-time API key for backend verification API calls.</p>
             </div>
           </div>
@@ -152,14 +151,10 @@ export function DashboardClient() {
                 </div>
                 <div className="mt-6 grid gap-3 md:grid-cols-2">
                   <div className="rounded-2xl border border-[var(--border)] bg-[var(--background-alt)] p-4">
-                    <p className="text-xs uppercase tracking-[0.3em] text-muted">Public App ID</p>
+                    <p className="text-xs uppercase tracking-[0.3em] text-muted">Publishable Key</p>
                     <p className="mt-3 break-all text-sm text-foreground">{app.public_app_id || app.app_id}</p>
                   </div>
                   <div className="rounded-2xl border border-[var(--border)] bg-[var(--background-alt)] p-4">
-                    <p className="text-xs uppercase tracking-[0.3em] text-muted">Audience App ID</p>
-                    <p className="mt-3 break-all text-sm text-foreground">{app.audience_app_id || app.id}</p>
-                  </div>
-                  <div className="rounded-2xl border border-[var(--border)] bg-[var(--background-alt)] p-4 md:col-span-2">
                     <p className="text-xs uppercase tracking-[0.3em] text-muted">Redirect URLs</p>
                     <p className="mt-3 text-sm text-foreground">{app.redirect_urls?.length || 0} configured</p>
                   </div>

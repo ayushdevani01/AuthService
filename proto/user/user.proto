@@ -132,6 +132,7 @@ message InitiateOAuthRequest {
   string code_challenge = 4; // PKCE
   string code_challenge_method = 5;
   string code_verifier = 6;
+  string public_app_id = 7; // publishable key for JWT aud on callback mint
 }
 
 message InitiateOAuthResponse {
@@ -150,6 +151,7 @@ message HandleOAuthCallbackResponse {
   string app_id = 2;
   string redirect_uri = 3;
   bool is_new_user = 4;
+  string public_app_id = 5; // publishable key for JWT aud
 }
 
 // Email/Password Authentication

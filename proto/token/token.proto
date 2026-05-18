@@ -33,6 +33,9 @@ message GenerateTokenPairRequest {
   string session_id = 6;
   int64 access_token_ttl = 7;
   int64 refresh_token_ttl = 8;
+  // audience is the JWT aud claim (publishable/public app id).
+  // When empty, token-service falls back to app_id for rollout safety.
+  string audience = 9;
 }
 
 message GenerateTokenPairResponse {
@@ -47,6 +50,9 @@ message RefreshTokensRequest {
   string refresh_token = 1;
   string app_id = 2;
   bool rotate_refresh_token = 3;
+  // audience is the JWT aud claim (publishable/public app id).
+  // When empty, token-service falls back to app_id for rollout safety.
+  string audience = 4;
 }
 
 message RefreshTokensResponse {

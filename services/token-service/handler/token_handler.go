@@ -23,7 +23,7 @@ func (h *TokenHandler) GenerateTokenPair(ctx context.Context, req *pb.GenerateTo
 	result, err := h.tokenService.GenerateTokenPair(
 		ctx, req.AppId, req.UserId, req.Email, req.Provider,
 		req.EmailVerified, req.SessionId,
-		req.AccessTokenTtl, req.RefreshTokenTtl,
+		req.AccessTokenTtl, req.RefreshTokenTtl, req.Audience,
 	)
 	if err != nil {
 		if errors.Is(err, service.ErrNoSigningKey) {
@@ -42,7 +42,7 @@ func (h *TokenHandler) GenerateTokenPair(ctx context.Context, req *pb.GenerateTo
 
 func (h *TokenHandler) RefreshTokens(ctx context.Context, req *pb.RefreshTokensRequest) (*pb.RefreshTokensResponse, error) {
 	accessToken, refreshToken, accessExp, refreshExp, err := h.tokenService.RefreshTokens(
-		ctx, req.RefreshToken, req.AppId, req.RotateRefreshToken,
+		ctx, req.RefreshToken, req.AppId, req.RotateRefreshToken, req.Audience,
 	)
 	if err != nil {
 		if errors.Is(err, service.ErrInvalidRefreshToken) {

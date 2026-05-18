@@ -350,22 +350,11 @@ export function AppDetailClient({ appId }: Props) {
               <div className="rounded-3xl border border-[var(--border)] bg-[var(--background-alt)] p-5">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
-                    <p className="text-xs uppercase tracking-[0.3em] text-muted">Public App ID</p>
+                    <p className="text-xs uppercase tracking-[0.3em] text-muted">Publishable Key</p>
                     <p className="mt-2 break-all text-base text-foreground">{app.public_app_id || app.app_id}</p>
-                    <p className="mt-2 text-sm text-muted">Use this for JWKS lookup, hosted login, and `x-app-id` on public verification requests.</p>
+                    <p className="mt-2 text-sm text-muted">One key for hosted login, JWKS lookup, JWT `aud`, and `x-app-id` on verification requests.</p>
                   </div>
-                  <Button variant="secondary" onClick={() => copyToClipboard(app.public_app_id || app.app_id).then(() => toast.success('Public app ID copied'))}><Copy className="mr-2 h-4 w-4" />Copy</Button>
-                </div>
-              </div>
-
-              <div className="rounded-3xl border border-[var(--border)] bg-[var(--background-alt)] p-5">
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div>
-                    <p className="text-xs uppercase tracking-[0.3em] text-muted">Audience App ID</p>
-                    <p className="mt-2 break-all text-base text-foreground">{app.audience_app_id || app.id}</p>
-                    <p className="mt-2 text-sm text-muted">Use this as the expected JWT `aud` value in the Node SDK or any backend verifier.</p>
-                  </div>
-                  <Button variant="secondary" onClick={() => copyToClipboard(app.audience_app_id || app.id).then(() => toast.success('Audience app ID copied'))}><Copy className="mr-2 h-4 w-4" />Copy</Button>
+                  <Button variant="secondary" onClick={() => copyToClipboard(app.public_app_id || app.app_id).then(() => toast.success('Publishable key copied'))}><Copy className="mr-2 h-4 w-4" />Copy</Button>
                 </div>
               </div>
             </div>
@@ -383,7 +372,7 @@ export function AppDetailClient({ appId }: Props) {
 
             <div className="rounded-3xl border border-[var(--border)] bg-[#0a0a0a] p-5 text-zinc-100">
               <p className="text-xs uppercase tracking-[0.3em] text-zinc-400">Suggested Environment</p>
-              <pre className="mt-4 overflow-x-auto whitespace-pre-wrap font-mono text-[13px] leading-6">{`AUTH_APP_ID=${app.public_app_id || app.app_id}\nAUTH_AUDIENCE=${app.audience_app_id || app.id}\nAUTH_API_URL=http://localhost:8080\nAUTH_ISSUER=https://auth.yourplatform.com`}</pre>
+              <pre className="mt-4 overflow-x-auto whitespace-pre-wrap font-mono text-[13px] leading-6">{`AUTH_APP_ID=${app.public_app_id || app.app_id}\nAUTH_API_URL=http://localhost:8080\nAUTH_ISSUER=https://auth.yourplatform.com`}</pre>
             </div>
           </Card>
 
@@ -399,9 +388,9 @@ export function AppDetailClient({ appId }: Props) {
             <div className="rounded-3xl border border-[var(--border)] bg-[var(--background-alt)] p-5">
               <p className="text-xs uppercase tracking-[0.3em] text-muted">Verification Checklist</p>
               <div className="mt-4 space-y-3 text-sm text-foreground">
-                <p>1. Use the public app ID for the JWKS route.</p>
-                <p>2. Use the audience app ID for JWT `aud` validation.</p>
-                <p>3. Use your API key when calling `POST /api/v1/verify`.</p>
+                <p>1. Use the publishable key for JWKS and JWT `aud`.</p>
+                <p>2. Use your API key when calling `POST /api/v1/verify`.</p>
+                <p>3. Keep secrets off the frontend; only the publishable key belongs there.</p>
               </div>
             </div>
             <div>
@@ -452,10 +441,32 @@ export function AppDetailClient({ appId }: Props) {
       {activeTab === 'providers' ? (
         <div className="grid gap-6 xl:grid-cols-[1.05fr_0.95fr]">
           <Card className="space-y-4 p-8">
-            <SectionHeading eyebrow="Providers" title="Configure Google and GitHub" description="Use curated scopes, explicit confirmations, and real provider defaults instead of raw free-text scope entry." />
+            <SectionHeading eyebrow="Providers" title="Bring your own OAuth credentials" description="Three steps: copy the AuthService callback, create the IdP app, then paste Client ID and Secret here." />
+            <div className="rounded-3xl border border-[var(--border)] bg-[var(--background-alt)] p-5 space-y-3">
+              <p className="text-xs uppercase tracking-[0.3em] text-muted">Step 1 · Callback URL</p>
+              <p className="break-all text-sm text-foreground">{`http://localhost:8080/oauth/callback/${providerForm.provider}`}</p>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={() => copyToClipboard(`http://localhost:8080/oauth/callback/${providerForm.provider}`).then(() => toast.success('Callback URL copied'))}
+                >
+                  <Copy className="mr-2 h-4 w-4" />Copy callback
+                </Button>
+                <a
+                  className="button-secondary inline-flex items-center"
+                  href={providerForm.provider === 'google' ? 'https://console.cloud.google.com/apis/credentials' : 'https://github.com/settings/developers'}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  <ExternalLink className="mr-2 h-4 w-4" />Open {providerForm.provider === 'google' ? 'Google Cloud' : 'GitHub'}
+                </a>
+              </div>
+              <p className="text-sm text-muted">Allowlist this AuthService URL in the IdP console — not your app redirect URI.</p>
+            </div>
             <form className="space-y-4" onSubmit={requestSaveProvider}>
               <div>
-                <label className="mb-2 block text-sm text-muted">Provider</label>
+                <label className="mb-2 block text-sm text-muted">Step 2 · Provider</label>
                 <select
                   className="input-shell"
                   value={providerForm.provider}
@@ -469,19 +480,28 @@ export function AppDetailClient({ appId }: Props) {
                 </select>
               </div>
               <div>
-                <label className="mb-2 block text-sm text-muted">Client ID</label>
+                <label className="mb-2 block text-sm text-muted">Step 3 · Client ID</label>
                 <Input value={providerForm.client_id} onChange={(event) => setProviderForm((current) => ({ ...current, client_id: event.target.value }))} />
               </div>
               <div>
                 <label className="mb-2 block text-sm text-muted">Client Secret</label>
-                <Input value={providerForm.client_secret} onChange={(event) => setProviderForm((current) => ({ ...current, client_secret: event.target.value }))} type="password" />
+                <Input value={providerForm.client_secret} onChange={(event) => setProviderForm((current) => ({ ...current, client_secret: event.target.value }))} type="password" placeholder="Leave blank when editing to keep the current secret" />
               </div>
               <div className="space-y-3">
-                <label className="block text-sm text-muted">Scopes</label>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <label className="block text-sm text-muted">Recommended scopes</label>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={() => copyToClipboard(providerForm.scopes.join(' ')).then(() => toast.success('Scopes copied'))}
+                  >
+                    <Copy className="mr-2 h-4 w-4" />Copy scopes
+                  </Button>
+                </div>
                 <PillMultiSelect options={[...scopeOptions[providerForm.provider]]} value={providerForm.scopes} onChange={(scopes) => setProviderForm((current) => ({ ...current, scopes }))} />
               </div>
               <Toggle checked={providerForm.enabled} onChange={(enabled) => setProviderForm((current) => ({ ...current, enabled }))} label="Enable provider after saving" />
-              <Button type="submit" loading={providerLoading}>Confirm Provider Changes</Button>
+              <Button type="submit" loading={providerLoading}>Save and enable</Button>
             </form>
           </Card>
 

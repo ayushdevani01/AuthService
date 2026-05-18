@@ -42,6 +42,7 @@ type OAuthProviderConfig struct {
 // OAuth state stored in Redis
 type oauthState struct {
 	AppID               string `json:"app_id"`
+	PublicAppID         string `json:"public_app_id,omitempty"`
 	Provider            string `json:"provider"`
 	RedirectURI         string `json:"redirect_uri"`
 	CodeChallenge       string `json:"code_challenge,omitempty"`
@@ -125,7 +126,7 @@ func (s *OAuthService) getProviderConfig(ctx context.Context, appID, provider st
 	}, nil
 }
 
-func (s *OAuthService) InitiateOAuth(ctx context.Context, appID, provider, redirectURI string) (string, string, error) {
+func (s *OAuthService) InitiateOAuth(ctx context.Context, appID, provider, redirectURI, publicAppID string) (string, string, error) {
 	providerConfig, err := s.getProviderConfig(ctx, appID, provider)
 	if err != nil {
 		return "", "", err
@@ -148,6 +149,7 @@ func (s *OAuthService) InitiateOAuth(ctx context.Context, appID, provider, redir
 
 	stateData, err := json.Marshal(oauthState{
 		AppID:               appID,
+		PublicAppID:         publicAppID,
 		Provider:            provider,
 		RedirectURI:         redirectURI,
 		CodeChallenge:       codeChallenge,
@@ -165,39 +167,39 @@ func (s *OAuthService) InitiateOAuth(ctx context.Context, appID, provider, redir
 	return authURL, state, nil
 }
 
-func (s *OAuthService) HandleOAuthCallback(ctx context.Context, provider, code, state string) (*repository.User, string, string, bool, error) {
+func (s *OAuthService) HandleOAuthCallback(ctx context.Context, provider, code, state string) (*repository.User, string, string, string, bool, error) {
 	// Validate state from Redis
 	redisKey := fmt.Sprintf("oauth_state:%s", state)
 	stateJSON, err := s.redisClient.Get(ctx, redisKey).Result()
 	if err != nil {
-		return nil, "", "", false, ErrInvalidState
+		return nil, "", "", "", false, ErrInvalidState
 	}
 
 	var stateData oauthState
 	if err := json.Unmarshal([]byte(stateJSON), &stateData); err != nil {
-		return nil, "", "", false, ErrInvalidState
+		return nil, "", "", "", false, ErrInvalidState
 	}
 
 	// Reject path/provider mismatch before consuming state so a retry with the
 	// correct callback path can still succeed.
 	if provider != stateData.Provider {
-		return nil, stateData.AppID, stateData.RedirectURI, false, ErrProviderMismatch
+		return nil, stateData.AppID, stateData.RedirectURI, stateData.PublicAppID, false, ErrProviderMismatch
 	}
 
 	s.redisClient.Del(ctx, redisKey)
 
 	// PKCE Verification
 	if stateData.CodeChallenge == "" {
-		return nil, stateData.AppID, stateData.RedirectURI, false, errors.New("missing PKCE code challenge")
+		return nil, stateData.AppID, stateData.RedirectURI, stateData.PublicAppID, false, errors.New("missing PKCE code challenge")
 	}
 	if !verifyPKCE(stateData.CodeChallenge, stateData.CodeChallengeMethod, stateData.CodeVerifier) {
-		return nil, stateData.AppID, stateData.RedirectURI, false, ErrInvalidVerifier
+		return nil, stateData.AppID, stateData.RedirectURI, stateData.PublicAppID, false, ErrInvalidVerifier
 	}
 
 	// Get provider config
 	providerConfig, err := s.getProviderConfig(ctx, stateData.AppID, provider)
 	if err != nil {
-		return nil, stateData.AppID, stateData.RedirectURI, false, err
+		return nil, stateData.AppID, stateData.RedirectURI, stateData.PublicAppID, false, err
 	}
 
 	// Exchange code for tokens and get user info
@@ -210,11 +212,11 @@ func (s *OAuthService) HandleOAuthCallback(ctx context.Context, provider, code, 
 	case "github":
 		email, name, avatarURL, providerUserID, emailVerified, err = s.handleGithubCallback(ctx, code, stateData.CodeVerifier, providerConfig)
 	default:
-		return nil, "", "", false, fmt.Errorf("unsupported provider: %s", provider)
+		return nil, "", "", "", false, fmt.Errorf("unsupported provider: %s", provider)
 	}
 
 	if err != nil {
-		return nil, "", "", false, err
+		return nil, stateData.AppID, stateData.RedirectURI, stateData.PublicAppID, false, err
 	}
 
 	providerUserIDPtr := &providerUserID
@@ -232,12 +234,12 @@ func (s *OAuthService) HandleOAuthCallback(ctx context.Context, provider, code, 
 	user, err := s.userService.CreateUser(ctx, stateData.AppID, email, namePtr, avatarURLPtr, provider, providerUserIDPtr, nil, emailVerified)
 	if err != nil {
 		if errors.Is(err, ErrAccountExistsUseOriginalProvider) {
-			return nil, stateData.AppID, stateData.RedirectURI, false, ErrAccountExistsUseOriginalProvider
+			return nil, stateData.AppID, stateData.RedirectURI, stateData.PublicAppID, false, ErrAccountExistsUseOriginalProvider
 		}
-		return nil, "", "", false, err
+		return nil, stateData.AppID, stateData.RedirectURI, stateData.PublicAppID, false, err
 	}
 
-	return user, stateData.AppID, stateData.RedirectURI, isNewUser, nil
+	return user, stateData.AppID, stateData.RedirectURI, stateData.PublicAppID, isNewUser, nil
 }
 
 func (s *OAuthService) handleGoogleCallback(ctx context.Context, code, codeVerifier string, config *OAuthProviderConfig) (string, string, string, string, bool, error) {
