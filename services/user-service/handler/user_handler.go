@@ -198,7 +198,7 @@ func (h *UserHandler) RegisterWithEmail(ctx context.Context, req *pb.RegisterWit
 	go func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
-		if err := h.emailVerifService.SendVerification(ctx, req.AppId, user.ID, user.Email, user.Name); err != nil {
+		if err := h.emailVerifService.SendVerification(ctx, req.AppId, user.ID, user.Email, user.Name, req.RedirectUri); err != nil {
 			log.Printf("Failed to send verification email to %s: %v", user.Email, err)
 		}
 	}()

@@ -220,6 +220,21 @@ func (r *UserRepository) GetEmailVerificationToken(ctx context.Context, tokenHas
 	return userID, nil
 }
 
+func (r *UserRepository) FindAnyEmailVerificationUser(ctx context.Context, tokenHash, appID string) (string, error) {
+	var userID string
+	err := r.db.QueryRow(ctx, `
+		SELECT user_id FROM email_verification_tokens
+		WHERE token_hash = $1 AND app_id = $2
+	`, tokenHash, appID).Scan(&userID)
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return "", nil
+		}
+		return "", err
+	}
+	return userID, nil
+}
+
 func (r *UserRepository) DeleteEmailVerificationToken(ctx context.Context, tokenHash string) error {
 	_, err := r.db.Exec(ctx, `
 		DELETE FROM email_verification_tokens WHERE token_hash = $1
