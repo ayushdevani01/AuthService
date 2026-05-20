@@ -261,6 +261,8 @@ func (dr *DeveloperRoutes) UpdateApp(c *gin.Context) {
 		if grpcReq.RedirectUrls == nil {
 			grpcReq.RedirectUrls = []string{}
 		}
+		updateRedirects := true
+		grpcReq.UpdateRedirectUrls = &updateRedirects
 	}
 	if req.RequireEmailVerification != nil {
 		grpcReq.RequireEmailVerification = req.RequireEmailVerification
@@ -401,27 +403,18 @@ func (dr *DeveloperRoutes) AddOAuthProvider(c *gin.Context) {
 		ClientId:     req.ClientID,
 		ClientSecret: req.ClientSecret,
 		Scopes:       req.Scopes,
+		Enabled:      req.Enabled,
 	})
 	if err != nil {
+		if strings.Contains(err.Error(), "oauth_credentials_required") {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "oauth_credentials_required"})
+			return
+		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
 	provider := resp.Provider
-	if req.Enabled != nil && !*req.Enabled {
-		updated, updateErr := dr.client.UpdateOAuthProvider(c.Request.Context(), &pb.UpdateOAuthProviderRequest{
-			AppId:       appID,
-			DeveloperId: developerID,
-			Provider:    req.Provider,
-			Enabled:     req.Enabled,
-			Scopes:      req.Scopes,
-		})
-		if updateErr != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": updateErr.Error()})
-			return
-		}
-		provider = updated.Provider
-	}
 
 	c.JSON(http.StatusCreated, gin.H{"provider": formatOAuthProvider(provider)})
 }
@@ -474,6 +467,10 @@ func (dr *DeveloperRoutes) UpdateOAuthProvider(c *gin.Context) {
 	if err != nil {
 		if strings.Contains(err.Error(), "at_least_one_auth_method_required") {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "at_least_one_auth_method_required"})
+			return
+		}
+		if strings.Contains(err.Error(), "oauth_credentials_required") {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "oauth_credentials_required"})
 			return
 		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})

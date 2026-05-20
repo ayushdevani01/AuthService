@@ -237,6 +237,17 @@ func (ar *AuthRoutes) Callback(c *gin.Context) {
 		return
 	}
 
+	redirectURI := callbackResp.RedirectUri
+	redirectOAuthError := func(code string) {
+		if redirectURI == "" {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": code})
+			return
+		}
+		values := url.Values{}
+		values.Set("error", code)
+		c.Redirect(http.StatusFound, buildRedirectURLWithFragment(redirectURI, values))
+	}
+
 	// Create session
 	sessionResp, err := ar.userClient.CreateSession(c.Request.Context(), &pbUser.CreateSessionRequest{
 		UserId:     callbackResp.User.Id,
@@ -246,7 +257,7 @@ func (ar *AuthRoutes) Callback(c *gin.Context) {
 		TtlSeconds: 30 * 24 * 60 * 60, // 30 days
 	})
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create session"})
+		redirectOAuthError("session_create_failed")
 		return
 	}
 
@@ -267,12 +278,9 @@ func (ar *AuthRoutes) Callback(c *gin.Context) {
 		Audience:        audience,
 	})
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to generate tokens"})
+		redirectOAuthError("token_mint_failed")
 		return
 	}
-
-	// Redirect back to the developer's app with tokens
-	redirectURI := callbackResp.RedirectUri
 
 	refreshToken := tokenResp.RefreshToken
 	if refreshToken == "" {
@@ -465,10 +473,11 @@ func (ar *AuthRoutes) Register(c *gin.Context) {
 	}
 
 	userResp, err := ar.userClient.RegisterWithEmail(c.Request.Context(), &pbUser.RegisterWithEmailRequest{
-		AppId:    resolvedAppID,
-		Email:    req.Email,
-		Password: req.Password,
-		Name:     req.Name,
+		AppId:       resolvedAppID,
+		Email:       req.Email,
+		Password:    req.Password,
+		Name:        req.Name,
+		RedirectUri: req.RedirectURI,
 	})
 	if err != nil {
 		if st, ok := status.FromError(err); ok && st.Code() == codes.InvalidArgument {
@@ -958,13 +967,13 @@ func (ar *AuthRoutes) UserInfo(c *gin.Context) {
 		return
 	}
 
-	// Verify token
+	// Verify signature/issuer first, then accept publishable key or legacy internal UUID as aud.
 	verifiedToken, err := jwt.Parse(tokenString, func(t *jwt.Token) (interface{}, error) {
 		if _, ok := t.Method.(*jwt.SigningMethodRSA); !ok {
 			return nil, fmt.Errorf("unexpected signing method")
 		}
 		return pubKey, nil
-	}, jwt.WithIssuer(ar.issuer), jwt.WithAudience(resolvedAppID))
+	}, jwt.WithIssuer(ar.issuer))
 
 	if err != nil || !verifiedToken.Valid {
 		errMsg := "invalid or expired token"
@@ -975,9 +984,23 @@ func (ar *AuthRoutes) UserInfo(c *gin.Context) {
 		return
 	}
 
-	// Token is fully verified. Call userClient to get full profile.
+	publicApp, pubErr := ar.getPublicApp(c, appID)
+	if pubErr != nil {
+		// appID from aud may already be the internal UUID for legacy tokens.
+		publicApp, pubErr = ar.getPublicApp(c, resolvedAppID)
+	}
+	if pubErr != nil || publicApp == nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid app audience"})
+		return
+	}
+	if appID != publicApp.AppId && appID != publicApp.Id && appID != resolvedAppID {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "audience mismatch"})
+		return
+	}
+
+	// Token is fully verified. Look up the user with the internal app UUID.
 	userResp, err := ar.userClient.GetUser(c.Request.Context(), &pbUser.GetUserRequest{
-		AppId:  appID,
+		AppId:  resolvedAppID,
 		UserId: userID,
 	})
 	if err != nil {

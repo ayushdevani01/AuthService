@@ -25,13 +25,16 @@ func (h *OAuthProviderHandler) AddOAuthProvider(ctx context.Context, req *pb.Add
 		return nil, status.Error(codes.InvalidArgument, "app_id, developer_id, provider, client_id, and client_secret are required")
 	}
 
-	provider, err := h.appService.AddOAuthProvider(ctx, req.AppId, req.DeveloperId, req.Provider, req.ClientId, req.ClientSecret, req.Scopes)
+	provider, err := h.appService.AddOAuthProvider(ctx, req.AppId, req.DeveloperId, req.Provider, req.ClientId, req.ClientSecret, req.Scopes, req.Enabled)
 	if err != nil {
 		if errors.Is(err, service.ErrAppNotFound) {
 			return nil, status.Error(codes.NotFound, "app not found")
 		}
 		if errors.Is(err, service.ErrNotAppOwner) {
 			return nil, status.Error(codes.PermissionDenied, "not the owner of this app")
+		}
+		if errors.Is(err, service.ErrProviderCredentialsRequired) {
+			return nil, status.Error(codes.InvalidArgument, "oauth_credentials_required")
 		}
 		return nil, status.Error(codes.Internal, "failed to add oauth provider")
 	}
@@ -124,6 +127,12 @@ func (h *OAuthProviderHandler) UpdateOAuthProvider(ctx context.Context, req *pb.
 		}
 		if errors.Is(err, service.ErrAtLeastOneAuthMethod) {
 			return nil, status.Error(codes.InvalidArgument, "at_least_one_auth_method_required")
+		}
+		if errors.Is(err, service.ErrProviderCredentialsRequired) {
+			return nil, status.Error(codes.InvalidArgument, "oauth_credentials_required")
+		}
+		if errors.Is(err, service.ErrProviderNotFound) {
+			return nil, status.Error(codes.NotFound, "oauth provider not found")
 		}
 		return nil, status.Error(codes.Internal, "failed to update oauth provider")
 	}

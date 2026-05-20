@@ -1,4 +1,4 @@
-import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 
 type AuthUser = {
   sub?: string;
@@ -24,6 +24,7 @@ type AuthContextValue = {
   login: (options?: { redirectUri?: string; mode?: 'login' | 'register' }) => void;
   logout: (options?: { redirectTo?: string }) => void;
   getAccessToken: () => string | null;
+  refreshSession: () => Promise<string | null>;
 };
 
 type AuthServiceProviderProps = {
@@ -36,6 +37,7 @@ type AuthServiceProviderProps = {
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
+const REFRESH_SKEW_MS = 60_000;
 
 function storageSessionKey(storageKey: string) {
   return `${storageKey}:session`;
@@ -53,19 +55,27 @@ function parseJwtPayload(token: string): AuthUser | null {
   }
 }
 
-function sessionExpired(session: StoredSession | null): boolean {
-  if (!session?.accessToken) return true;
+function sessionExpiresAtMs(session: StoredSession | null): number | null {
+  if (!session?.accessToken) return null;
   if (session.expiresAt) {
     const expiresAt = Number(session.expiresAt);
-    if (!Number.isNaN(expiresAt) && expiresAt * 1000 <= Date.now()) {
-      return true;
-    }
+    if (!Number.isNaN(expiresAt)) return expiresAt * 1000;
   }
   const payload = parseJwtPayload(session.accessToken);
-  if (payload?.exp && payload.exp * 1000 <= Date.now()) {
-    return true;
-  }
-  return false;
+  if (payload?.exp) return payload.exp * 1000;
+  return null;
+}
+
+function sessionExpired(session: StoredSession | null): boolean {
+  const expiresAt = sessionExpiresAtMs(session);
+  if (expiresAt == null) return !session?.accessToken;
+  return expiresAt <= Date.now();
+}
+
+function sessionNearExpiry(session: StoredSession | null): boolean {
+  const expiresAt = sessionExpiresAtMs(session);
+  if (expiresAt == null) return false;
+  return expiresAt - Date.now() <= REFRESH_SKEW_MS;
 }
 
 function readSession(storageKey: string): StoredSession | null {
@@ -116,17 +126,71 @@ export function AuthServiceProvider({
   const [session, setSession] = useState<StoredSession | null>(null);
   const [loading, setLoading] = useState(true);
   const resolvedApiUrl = useMemo(() => resolveApiUrl(authUrl, apiUrl), [authUrl, apiUrl]);
+  const refreshInFlight = useRef<Promise<string | null> | null>(null);
+
+  const applySession = useCallback((next: StoredSession | null) => {
+    writeSession(storageKey, next);
+    setSession(next);
+  }, [storageKey]);
+
+  const refreshSession = useCallback(async () => {
+    if (refreshInFlight.current) return refreshInFlight.current;
+
+    refreshInFlight.current = (async () => {
+      const current = readSession(storageKey);
+      if (!current?.refreshToken) return null;
+
+      try {
+        const response = await fetch(`${resolvedApiUrl}/oauth/refresh`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            refresh_token: current.refreshToken,
+            app_id: appId,
+            rotate_refresh_token: true,
+          }),
+        });
+        if (!response.ok) {
+          applySession(null);
+          return null;
+        }
+        const data = await response.json();
+        const next: StoredSession = {
+          accessToken: data.access_token,
+          refreshToken: data.refresh_token || current.refreshToken,
+          tokenType: data.token_type || current.tokenType || 'Bearer',
+          expiresAt: data.expires_at != null ? String(data.expires_at) : current.expiresAt,
+        };
+        applySession(next);
+        return next.accessToken;
+      } catch {
+        return null;
+      } finally {
+        refreshInFlight.current = null;
+      }
+    })();
+
+    return refreshInFlight.current;
+  }, [appId, applySession, resolvedApiUrl, storageKey]);
 
   useEffect(() => {
     const existing = readSession(storageKey);
     if (existing && sessionExpired(existing)) {
-      writeSession(storageKey, null);
-      setSession(null);
+      if (existing.refreshToken) {
+        void refreshSession().finally(() => setLoading(false));
+        return;
+      }
+      applySession(null);
     } else if (existing) {
       setSession(existing);
     }
     setLoading(false);
-  }, [storageKey]);
+  }, [applySession, refreshSession, storageKey]);
+
+  useEffect(() => {
+    if (!session?.refreshToken || sessionExpired(session) || !sessionNearExpiry(session)) return;
+    void refreshSession();
+  }, [refreshSession, session]);
 
   const login = useCallback((options?: { redirectUri?: string; mode?: 'login' | 'register' }) => {
     const target = new URL(authUrl);
@@ -151,12 +215,11 @@ export function AuthServiceProvider({
         }),
       }).catch(() => undefined);
     }
-    writeSession(storageKey, null);
-    setSession(null);
+    applySession(null);
     if (options?.redirectTo) {
       window.location.href = options.redirectTo;
     }
-  }, [appId, resolvedApiUrl, storageKey]);
+  }, [appId, applySession, resolvedApiUrl, storageKey]);
 
   const user = useMemo(() => {
     if (!session?.accessToken || sessionExpired(session)) return null;
@@ -170,8 +233,9 @@ export function AuthServiceProvider({
     accessToken: session?.accessToken || null,
     login,
     logout,
+    refreshSession,
     getAccessToken: () => (session && !sessionExpired(session) ? session.accessToken : null),
-  }), [user, session, loading, login, logout]);
+  }), [user, session, loading, login, logout, refreshSession]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

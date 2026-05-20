@@ -160,6 +160,7 @@ message RegisterWithEmailRequest {
   string email = 2;
   string password = 3;
   string name = 4;
+  string redirect_uri = 5;
 }
 
 message RegisterWithEmailResponse {

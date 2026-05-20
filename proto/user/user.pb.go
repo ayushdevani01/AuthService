@@ -1156,6 +1156,7 @@ type RegisterWithEmailRequest struct {
 	Email         string                 `protobuf:"bytes,2,opt,name=email,proto3" json:"email,omitempty"`
 	Password      string                 `protobuf:"bytes,3,opt,name=password,proto3" json:"password,omitempty"`
 	Name          string                 `protobuf:"bytes,4,opt,name=name,proto3" json:"name,omitempty"`
+	RedirectUri   string                 `protobuf:"bytes,5,opt,name=redirect_uri,json=redirectUri,proto3" json:"redirect_uri,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1214,6 +1215,13 @@ func (x *RegisterWithEmailRequest) GetPassword() string {
 func (x *RegisterWithEmailRequest) GetName() string {
 	if x != nil {
 		return x.Name
+	}
+	return ""
+}
+
+func (x *RegisterWithEmailRequest) GetRedirectUri() string {
+	if x != nil {
+		return x.RedirectUri
 	}
 	return ""
 }
@@ -2599,12 +2607,13 @@ const file_user_user_proto_rawDesc = "" +
 	"\x06app_id\x18\x02 \x01(\tR\x05appId\x12!\n" +
 	"\fredirect_uri\x18\x03 \x01(\tR\vredirectUri\x12\x1e\n" +
 	"\vis_new_user\x18\x04 \x01(\bR\tisNewUser\x12\"\n" +
-	"\rpublic_app_id\x18\x05 \x01(\tR\vpublicAppId\"w\n" +
+	"\rpublic_app_id\x18\x05 \x01(\tR\vpublicAppId\"\x9a\x01\n" +
 	"\x18RegisterWithEmailRequest\x12\x15\n" +
 	"\x06app_id\x18\x01 \x01(\tR\x05appId\x12\x14\n" +
 	"\x05email\x18\x02 \x01(\tR\x05email\x12\x1a\n" +
 	"\bpassword\x18\x03 \x01(\tR\bpassword\x12\x12\n" +
-	"\x04name\x18\x04 \x01(\tR\x04name\"h\n" +
+	"\x04name\x18\x04 \x01(\tR\x04name\x12!\n" +
+	"\fredirect_uri\x18\x05 \x01(\tR\vredirectUri\"h\n" +
 	"\x19RegisterWithEmailResponse\x12\x1e\n" +
 	"\x04user\x18\x01 \x01(\v2\n" +
 	".user.UserR\x04user\x12+\n" +
