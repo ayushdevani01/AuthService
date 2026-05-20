@@ -147,7 +147,7 @@ export function DashboardClient() {
                     <p className="text-lg font-medium text-foreground">{app.name}</p>
                     <p className="mt-1 text-sm text-muted">Created {formatDate(app.created_at)}</p>
                   </div>
-                  <Button type="button" variant="ghost" className="shrink-0" onClick={(event) => { event.preventDefault(); void copyToClipboard(app.public_app_id || app.app_id).then(() => toast.success('Public app ID copied')); }}><Copy className="mr-2 h-4 w-4" />Copy Public ID</Button>
+                  <Button type="button" variant="ghost" className="shrink-0" onClick={(event) => { event.preventDefault(); void copyToClipboard(app.public_app_id || app.app_id).then(() => toast.success('Publishable key copied')); }}><Copy className="mr-2 h-4 w-4" />Copy Key</Button>
                 </div>
                 <div className="mt-6 grid gap-3 md:grid-cols-2">
                   <div className="rounded-2xl border border-[var(--border)] bg-[var(--background-alt)] p-4">

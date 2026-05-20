@@ -254,10 +254,17 @@ export function AppDetailClient({ appId }: Props) {
     if (code === 'at_least_one_auth_method_required') {
       return 'Keep at least one sign-in method enabled (email or an OAuth provider).';
     }
+    if (code === 'oauth_credentials_required') {
+      return 'Add a Client ID and Client Secret before enabling this provider.';
+    }
     return code || fallback;
   }
 
   async function toggleProvider(provider: OAuthProvider) {
+    if (!provider.enabled && !provider.client_id) {
+      toast.error('Add a Client ID and Client Secret before enabling this provider.');
+      return;
+    }
     try {
       await api.patch(`/api/v1/developers/apps/${appId}/providers/${provider.provider}`, { enabled: !provider.enabled, scopes: provider.scopes });
       toast.success('Provider updated');

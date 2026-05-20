@@ -2,7 +2,7 @@ import * as jose from 'jose';
 
 export interface AuthOptions {
   appId?: string;
-  /** @deprecated Prefer appId. Falls back to AUTH_AUDIENCE for one release. */
+  /** @deprecated Prefer appId. Still accepted for one-release dual-accept of legacy tokens. */
   audience?: string;
   apiUrl?: string;
   issuer?: string;
@@ -17,7 +17,7 @@ export interface AuthPayload {
 
 export class AuthVerifier {
   private appId: string;
-  private audience: string;
+  private audiences: string[];
   private apiUrl: string;
   private issuer: string;
   private jwksUrl: URL;
@@ -25,10 +25,8 @@ export class AuthVerifier {
 
   constructor(options?: AuthOptions) {
     this.appId = options?.appId || process.env.AUTH_APP_ID || process.env.AUTH_PUBLISHABLE_KEY || '';
-    this.audience =
-      options?.audience ||
-      process.env.AUTH_AUDIENCE ||
-      this.appId;
+    const legacyAudience = options?.audience || process.env.AUTH_AUDIENCE || '';
+    this.audiences = Array.from(new Set([this.appId, legacyAudience].filter(Boolean)));
     this.apiUrl = options?.apiUrl || process.env.AUTH_API_URL || 'http://localhost:8080';
     this.issuer = options?.issuer || process.env.AUTH_ISSUER || 'https://auth.yourplatform.com';
 
@@ -42,11 +40,9 @@ export class AuthVerifier {
 
   async verifyToken(token: string): Promise<AuthPayload> {
     try {
-      // Prefer publishable key as aud; also accept legacy internal UUID if AUTH_AUDIENCE is set separately.
-      const audiences = Array.from(new Set([this.audience, this.appId].filter(Boolean)));
       let lastError: Error | null = null;
 
-      for (const audience of audiences) {
+      for (const audience of this.audiences) {
         try {
           const { payload } = await jose.jwtVerify(token, this.jwks, {
             issuer: this.issuer,

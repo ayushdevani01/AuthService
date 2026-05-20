@@ -74,7 +74,7 @@ const docSections = [
   {
     id: 'hosted-login',
     title: 'Launch hosted login fast',
-    body: 'The hosted login UI receives the public app ID plus the redirect URI, then returns tokens back to your application callback route.',
+    body: 'The hosted login UI receives the publishable key plus the redirect URI, then returns tokens back to your application callback route.',
     bullets: [
       'Hosted login runs on `http://localhost:3001` in local development',
       'Pass `app_id` and `redirect_uri` query params',
@@ -85,7 +85,7 @@ const docSections = [
   {
     id: 'react-sdk',
     title: 'Use the React SDK for the frontend',
-    body: 'If your app is React or Next.js client-side, the frontend SDK removes most manual auth wiring. You only provide the public app ID, auth URL, and redirect URI.',
+    body: 'If your app is React or Next.js client-side, the frontend SDK removes most manual auth wiring. You only provide the publishable key, auth URL, and redirect URI.',
     bullets: [
       'Wrap your app in `AuthServiceProvider`.',
       'Render `AuthCallbackHandler` on the callback route.',
